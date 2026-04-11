@@ -1,5 +1,9 @@
 # MeetOPS — Firebase Setup Guide
 
+- Live Demo at https://meetops-661f5.web.app/
+- Email: demo@demoaccount.com
+- Password: Dem0@1234
+
 ## What you need
 
 - Node.js installed (https://nodejs.org — LTS version)
