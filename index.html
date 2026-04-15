@@ -1954,6 +1954,7 @@ function getMgrColor(i) {
 // NAV
 // ══════════════════════════════════════════
 function showPage(name, el) {
+  const leavingCT = getActivePage() === 'cycletime' && name !== 'cycletime';
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById('page-' + name).classList.add('active');
@@ -1968,11 +1969,16 @@ function showPage(name, el) {
     document.getElementById('employees-content').style.display = allDays.length ? 'block' : 'none';
     document.getElementById('employees-empty').style.display = allDays.length ? 'none' : 'block';
   }
-  if (name === 'trends') renderTrends();
-  if (name === 'managers') renderManagers();
-  if (name === 'employees') renderEmployeeCards();
-  if (name === 'history') renderHistory();
-  if (name === 'cycletime') renderCycleTime();
+  if (name === 'cycletime') {
+    setCTDateRange();
+    renderCycleTime();
+  } else {
+    if (leavingCT) restoreFullDateRange();
+    if (name === 'trends')    renderTrends();
+    if (name === 'managers')  renderManagers();
+    if (name === 'employees') renderEmployeeCards();
+    if (name === 'history')   renderHistory();
+  }
 }
 
 // Navigate directly to an employee detail from any page
@@ -2046,6 +2052,41 @@ function resetDateRange() {
   const weekAgo = allDates.length >= 7 ? allDates[allDates.length - 7] : allDates[0];
   document.getElementById('date-from').value = weekAgo;
   document.getElementById('date-to').value   = latest;
+  applyFilters();
+}
+
+// Switch date pickers to CT-only date range when on Cycle Time tab
+function setCTDateRange() {
+  if (!ctDays.length) return;
+  const ctDates = ctDays.map(d => d.date).sort();
+  const fromEl = document.getElementById('date-from');
+  const toEl   = document.getElementById('date-to');
+  const latest  = ctDates[ctDates.length - 1];
+  const weekAgo = ctDates.length >= 7 ? ctDates[ctDates.length - 7] : ctDates[0];
+  fromEl.value = weekAgo;
+  toEl.value   = latest;
+  fromEl.min   = ctDates[0];
+  fromEl.max   = latest;
+  toEl.min     = ctDates[0];
+  toEl.max     = latest;
+}
+
+// Restore full combined date range when leaving Cycle Time tab
+function restoreFullDateRange() {
+  const perfDates   = allDays.map(d => d.date);
+  const ctDatesList = ctDays.map(d => d.date);
+  const allDates    = [...new Set([...perfDates, ...ctDatesList])].sort();
+  if (!allDates.length) return;
+  const fromEl = document.getElementById('date-from');
+  const toEl   = document.getElementById('date-to');
+  const latest  = allDates[allDates.length - 1];
+  const weekAgo = allDates.length >= 7 ? allDates[allDates.length - 7] : allDates[0];
+  fromEl.value = weekAgo;
+  toEl.value   = latest;
+  fromEl.min   = allDates[0];
+  fromEl.max   = latest;
+  toEl.min     = allDates[0];
+  toEl.max     = latest;
   applyFilters();
 }
 
