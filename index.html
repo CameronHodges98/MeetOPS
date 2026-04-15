@@ -1065,6 +1065,174 @@
   }
   .upload-tab:hover { border-color: var(--accent-cyan); color: var(--text-primary); }
   .upload-tab.active { background: var(--accent-cyan-dim); color: var(--accent-cyan); border-color: rgba(88,166,255,0.3); font-weight: 600; }
+
+  /* ─────────────────────────────────────────
+     RESPONSIVE — LAPTOP (≤1280px)
+  ───────────────────────────────────────── */
+  @media (max-width: 1280px) {
+    :root { --nav-width: 200px; }
+    .kpi-grid { grid-template-columns: repeat(3, 1fr); }
+    .chart-grid { grid-template-columns: 1fr; }
+    .chart-grid-3 { grid-template-columns: 1fr 1fr; }
+  }
+
+  /* ─────────────────────────────────────────
+     RESPONSIVE — TABLET / iPAD (≤1024px)
+  ───────────────────────────────────────── */
+  @media (max-width: 1024px) {
+    :root { --nav-width: 56px; }
+
+    /* Auto-collapse sidebar on tablet */
+    #sidebar { width: 56px; }
+    #main { margin-left: 56px; }
+    .sidebar-logo-content .logo-text,
+    .sidebar-logo-content .logo-sub { opacity: 0; pointer-events: none; }
+    .nav-item span { opacity: 0; }
+    .nav-section-label { opacity: 0; }
+    .upload-btn .btn-label { opacity: 0; width: 0; overflow: hidden; }
+    .upload-btn { padding: 10px; justify-content: center; }
+    .sidebar-toggle svg { transform: rotate(180deg); }
+
+    /* Topbar — wrap filters */
+    #topbar { flex-wrap: wrap; height: auto; padding: 10px 16px; gap: 8px; }
+    .topbar-right { flex-wrap: wrap; gap: 8px; }
+    #date-from, #date-to { width: 120px; }
+
+    /* Grids */
+    .kpi-grid { grid-template-columns: repeat(3, 1fr); }
+    .chart-grid { grid-template-columns: 1fr; }
+    .chart-grid-3 { grid-template-columns: 1fr 1fr; }
+    .manager-grid { grid-template-columns: 1fr; }
+    .manager-kpis { grid-template-columns: repeat(3, 1fr) !important; }
+    .insights-grid { grid-template-columns: 1fr; }
+
+    /* CT charts stack */
+    #ct-bar-wrap, #ct-hist-chart { height: 300px; }
+
+    /* Tables — allow horizontal scroll */
+    .data-table-wrap { overflow-x: auto; }
+    .data-table { min-width: 600px; }
+
+    /* Upload modal */
+    .upload-modal { width: 90vw !important; }
+  }
+
+  /* ─────────────────────────────────────────
+     RESPONSIVE — MOBILE (≤640px)
+  ───────────────────────────────────────── */
+  @media (max-width: 640px) {
+    :root { --nav-width: 0px; }
+
+    /* Hide sidebar entirely, use bottom nav instead */
+    #sidebar { display: none !important; }
+    #main { margin-left: 0; }
+    #content { padding: 12px; }
+
+    /* Topbar */
+    #topbar { padding: 8px 12px; flex-wrap: wrap; height: auto; gap: 6px; }
+    .topbar-left { flex: 1; min-width: 0; }
+    #page-title { font-size: 14px; }
+    #breadcrumb { display: none; }
+    .topbar-right { width: 100%; justify-content: flex-start; flex-wrap: wrap; gap: 6px; }
+    #date-from, #date-to { width: 100px; font-size: 11px; }
+    .filter-select { font-size: 11px; padding: 5px 8px; }
+    #record-count { font-size: 10px; }
+    .theme-toggle { width: 30px; height: 30px; }
+    #user-badge { max-width: 100px; font-size: 10px; }
+
+    /* KPI cards — 2 columns on mobile */
+    .kpi-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .kpi-value { font-size: 22px; }
+
+    /* Charts — all stack single column */
+    .chart-grid,
+    .chart-grid-3,
+    .manager-grid,
+    .insights-grid { grid-template-columns: 1fr; }
+    div[style*="grid-template-columns:1fr 1fr"] { grid-template-columns: 1fr !important; }
+
+    /* CT charts */
+    #ct-bar-wrap, #ct-hist-chart { height: 260px; }
+
+    /* Employee grid */
+    .employee-grid { grid-template-columns: 1fr; }
+
+    /* Manager cards */
+    .manager-kpis { grid-template-columns: repeat(2, 1fr) !important; }
+    .manager-card-header { flex-wrap: wrap; gap: 8px; }
+
+    /* Detail headers */
+    .detail-header { flex-wrap: wrap; gap: 10px; }
+    .detail-avatar { width: 44px !important; height: 44px !important; font-size: 15px !important; }
+
+    /* Section headers */
+    .section-header { flex-wrap: wrap; gap: 6px; }
+    .section-sub { font-size: 9px; }
+
+    /* Tables */
+    .data-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .data-table { min-width: 560px; font-size: 11.5px; }
+    .data-table th, .data-table td { padding: 7px 10px; }
+
+    /* Upload modal */
+    .upload-modal { width: 95vw !important; padding: 16px !important; }
+    .modal-title { font-size: 14px; }
+
+    /* History rows */
+    .history-row { flex-wrap: wrap; gap: 6px; font-size: 11px; }
+    .history-date { width: auto; }
+
+    /* CT controls — stack */
+    .chart-card > div[style*="display:flex"] { flex-wrap: wrap !important; gap: 10px !important; }
+
+    /* CT employee cards */
+    .ct-emp-stats { grid-template-columns: repeat(2, 1fr); }
+
+    /* Needs attention grid */
+    div[style*="minmax(260px"] { grid-template-columns: 1fr !important; }
+  }
+
+  /* ─────────────────────────────────────────
+     MOBILE BOTTOM NAV
+  ───────────────────────────────────────── */
+  @media (max-width: 640px) {
+    #mobile-nav {
+      display: flex;
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      background: var(--bg-surface);
+      border-top: 1px solid var(--border);
+      z-index: 100;
+      height: 56px;
+    }
+    #content { padding-bottom: 68px; }
+
+    .mobile-nav-item {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      cursor: pointer;
+      color: var(--text-muted);
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+      text-transform: uppercase;
+      transition: color 0.15s;
+      border: none;
+      background: none;
+      font-family: 'Space Grotesk', sans-serif;
+    }
+    .mobile-nav-item svg { width: 18px; height: 18px; }
+    .mobile-nav-item.active { color: var(--accent-cyan); }
+  }
+
+  /* Hide mobile nav on non-mobile */
+  @media (min-width: 641px) {
+    #mobile-nav { display: none !important; }
+  }
 </style>
 </head>
 <body>
@@ -1626,6 +1794,7 @@ auth.onAuthStateChanged(async user => {
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('sidebar').style.display = 'flex';
     document.getElementById('main').style.display = 'flex';
+    if (window.innerWidth <= 640) document.getElementById('mobile-nav').style.display = 'flex';
     document.getElementById('user-badge').textContent = user.email;
     applyStoredTheme();
     await initApp();
@@ -1634,10 +1803,17 @@ auth.onAuthStateChanged(async user => {
     document.getElementById('login-screen').style.display = 'flex';
     document.getElementById('sidebar').style.display = 'none';
     document.getElementById('main').style.display = 'none';
+    document.getElementById('mobile-nav').style.display = 'none';
     allDays = [];
     ctDays  = [];
   }
 });
+
+function mobileNav(page, el) {
+  document.querySelectorAll('.mobile-nav-item').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  showPage(page, null);
+}
 
 // ══════════════════════════════════════════
 // FIRESTORE — PERFORMANCE DATA
@@ -1846,8 +2022,15 @@ function updateDateRange() {
   if (!allDates.length) return;
   const fromEl = document.getElementById('date-from');
   const toEl   = document.getElementById('date-to');
-  if (!fromEl.value) fromEl.value = allDates[0];
-  if (!toEl.value)   toEl.value   = allDates[allDates.length - 1];
+  // Default to most recent 7 days of available data
+  if (!fromEl.value && !toEl.value) {
+    const latest = allDates[allDates.length - 1];
+    const weekAgo = allDates.length >= 7
+      ? allDates[allDates.length - 7]
+      : allDates[0];
+    fromEl.value = weekAgo;
+    toEl.value   = latest;
+  }
   fromEl.min = allDates[0];
   fromEl.max = allDates[allDates.length - 1];
   toEl.min   = allDates[0];
@@ -1859,8 +2042,10 @@ function resetDateRange() {
   const ctDatesList = ctDays.map(d => d.date);
   const allDates = [...new Set([...perfDates, ...ctDatesList])].sort();
   if (!allDates.length) return;
-  document.getElementById('date-from').value = allDates[0];
-  document.getElementById('date-to').value   = allDates[allDates.length - 1];
+  const latest  = allDates[allDates.length - 1];
+  const weekAgo = allDates.length >= 7 ? allDates[allDates.length - 7] : allDates[0];
+  document.getElementById('date-from').value = weekAgo;
+  document.getElementById('date-to').value   = latest;
   applyFilters();
 }
 
@@ -3825,5 +4010,29 @@ async function initApp() {
 
 // Auth handles initApp via onAuthStateChanged — no direct call needed
 </script>
+<!-- MOBILE BOTTOM NAV -->
+<div id="mobile-nav" style="display:none">
+  <button class="mobile-nav-item active" data-page="dashboard" onclick="mobileNav('dashboard', this)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+    Dashboard
+  </button>
+  <button class="mobile-nav-item" data-page="managers" onclick="mobileNav('managers', this)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    Managers
+  </button>
+  <button class="mobile-nav-item" data-page="employees" onclick="mobileNav('employees', this)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+    Employees
+  </button>
+  <button class="mobile-nav-item" data-page="cycletime" onclick="mobileNav('cycletime', this)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 14 14"/></svg>
+    Cycle
+  </button>
+  <button class="mobile-nav-item" data-page="trends" onclick="mobileNav('trends', this)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+    Trends
+  </button>
+</div>
+
 </body>
 </html>
