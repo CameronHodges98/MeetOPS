@@ -4471,22 +4471,15 @@
                 const from = document.getElementById("date-from").value;
                 const to = document.getElementById("date-to").value;
                 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-                let records = ctDays
+                // CT records are always dept-wide — never scoped to a single manager
+                // This ensures dept averages (used for Returns Clerk coaching rule etc.) are accurate
+                return ctDays
                     .filter((d) => DATE_RE.test(d.date))
                     .filter(
                         (d) =>
                             (!from || d.date >= from) && (!to || d.date <= to),
                     )
                     .flatMap((d) => d.records);
-
-                // Scope to manager's own employees when not admin
-                if (currentUserRole === "manager" && currentUserSupervisor) {
-                    records = records.filter(
-                        (r) => r.supervisor === currentUserSupervisor,
-                    );
-                }
-
-                return records;
             }
 
             function getManagerCycleAvg(managerName) {
@@ -4816,8 +4809,8 @@
                   <div style="font-size:10px;color:var(--text-muted);margin-top:2px">${e.jobTitle}</div>
                 </div>
                 <div style="text-align:right;flex-shrink:0">
-                  <div style="font-size:13px;font-weight:700;font-family:'JetBrains Mono',monospace;color:${coached ? "var(--accent-green)" : lowPPH ? "var(--accent-red)" : "var(--accent-cyan)"}">${ePPH.toFixed(1)}</div>
-                  <div style="font-size:11px;color:${coached ? "var(--accent-green)" : highGAP ? "var(--accent-red)" : "var(--text-muted)"};">${(eGAP * 100).toFixed(1)}% GAP</div>
+                  <div style="font-size:13px;font-weight:700;font-family:'JetBrains Mono',monospace;color:${coached ? "var(--accent-green)" : lowPPH ? "var(--accent-red)" : "var(--accent-green)"}">${ePPH.toFixed(1)}</div>
+                  <div style="font-size:11px;color:${coached ? "var(--accent-green)" : highGAP ? "var(--accent-red)" : "var(--accent-green)"};">${(eGAP * 100).toFixed(1)}% GAP</div>
                 </div>
                 <div style="display:flex;flex-direction:column;gap:3px;flex-shrink:0">${badges}</div>
               </div>`;
@@ -4845,17 +4838,22 @@
                             (!from || d.date >= from) && (!to || d.date <= to)
                         );
                     });
-                    const pphData = filteredDays.map((d) => {
-                        const r = d.rows.filter(
-                            (r) => r["SUPERVISOR"] === name,
-                        );
-                        return {
-                            date: d.date,
-                            pph: r.length
-                                ? parseFloat(weightedPPH(r).toFixed(2))
-                                : null,
-                        };
-                    });
+                    // Only include days where this manager actually has data
+                    const pphData = filteredDays
+                        .map((d) => {
+                            const r = d.rows.filter(
+                                (r) => r["SUPERVISOR"] === name,
+                            );
+                            return r.length
+                                ? {
+                                      date: d.date,
+                                      pph: parseFloat(
+                                          weightedPPH(r).toFixed(2),
+                                      ),
+                                  }
+                                : null;
+                        })
+                        .filter(Boolean);
 
                     const pphCtx = document
                         .getElementById("mgr-detail-pph")
@@ -5091,11 +5089,26 @@
                             const titleMaxPPH = Math.max(
                                 ...titleEmps.map((e) => weightedPPH(e.rows)),
                             );
-                            const titleFlagged = titleEmps.filter(
-                                (e) =>
-                                    weightedPPH(e.rows) < 100 ||
-                                    avg(e.rows, "GAP %") > 0.1,
-                            ).length;
+                            const titleFlagged = titleEmps.filter((e) => {
+                                const ePPH = weightedPPH(e.rows);
+                                const eGAP = avg(e.rows, "GAP %");
+                                if (ePPH === 0 && eGAP === 0) return false;
+                                if (e.jobTitle === "Returns Clerk") {
+                                    if (deptIPFAvg === null) return false;
+                                    const empR = calcCycleStats(
+                                        allCTRecords.filter(
+                                            (r) =>
+                                                r.employee === e.name &&
+                                                r.action === RETURNS_ACTION,
+                                        ),
+                                        ctThreshold,
+                                    ).filter((s) => s.avgCycle > 0);
+                                    return empR.length
+                                        ? empR[0].avgCycle > deptIPFAvg
+                                        : false;
+                                }
+                                return ePPH < 100 || eGAP > 0.1;
+                            }).length;
 
                             const rows_html = titleEmps
                                 .map((e, i) => {
@@ -5119,12 +5132,6 @@
                                                   100
                                               ).toFixed(0)
                                             : 0;
-                                    const gapColor =
-                                        avgGAP > 0.1
-                                            ? "var(--accent-red)"
-                                            : avgGAP > 0.06
-                                              ? "var(--accent-amber)"
-                                              : "var(--accent-green)";
 
                                     const ctRecs =
                                         getFilteredCTRecords().filter(
@@ -5149,26 +5156,94 @@
                                             ? `<span class="mono" style="color:var(--accent-purple)">${fmtSec(ctOverallAvg)}</span>`
                                             : `<span style="color:var(--text-muted);font-size:10px">—</span>`;
 
-                                    const flagLowPPH = avgPPH < 100;
-                                    const flagHighGAP = avgGAP > 0.1;
-                                    const flagged = flagLowPPH || flagHighGAP;
+                                    // ── Coaching rules ──
+                                    // Rule 1: 0 PPH + 0 GAP = no activity, no highlighting
+                                    const noActivity =
+                                        avgPPH === 0 && avgGAP === 0;
+
+                                    // Rule 2: Returns Clerk — flag only if avg CT for Return Item Processed > dept avg
+                                    let isReturnsClerkFlagged = false;
+                                    if (
+                                        !noActivity &&
+                                        e.jobTitle === "Returns Clerk"
+                                    ) {
+                                        if (deptIPFAvg !== null) {
+                                            const empReturnRecs =
+                                                allCTRecords.filter(
+                                                    (r) =>
+                                                        r.employee === e.name &&
+                                                        r.action ===
+                                                            RETURNS_ACTION,
+                                                );
+                                            const empReturnStats =
+                                                calcCycleStats(
+                                                    empReturnRecs,
+                                                    ctThreshold,
+                                                ).filter((s) => s.avgCycle > 0);
+                                            isReturnsClerkFlagged =
+                                                empReturnStats.length
+                                                    ? empReturnStats[0]
+                                                          .avgCycle > deptIPFAvg
+                                                    : false;
+                                        }
+                                    }
+
+                                    // Rule 3: Everyone else — flag if PPH < 100 or GAP > 10%
+                                    const flagLowPPH =
+                                        !noActivity &&
+                                        e.jobTitle !== "Returns Clerk" &&
+                                        avgPPH < 100;
+                                    const flagHighGAP =
+                                        !noActivity &&
+                                        e.jobTitle !== "Returns Clerk" &&
+                                        avgGAP > 0.1;
+                                    const flagged =
+                                        e.jobTitle === "Returns Clerk"
+                                            ? isReturnsClerkFlagged
+                                            : flagLowPPH || flagHighGAP;
+
                                     const rowBg = flagged
                                         ? "background:rgba(248,81,73,0.07);border-left:3px solid var(--accent-red);"
                                         : "";
-                                    const flags = [
-                                        flagLowPPH
-                                            ? `<span style="font-size:9px;font-weight:700;background:var(--accent-red-dim);color:var(--accent-red);padding:2px 5px;border-radius:3px;margin-left:6px;font-family:monospace">LOW PPH</span>`
-                                            : "",
-                                        flagHighGAP
-                                            ? `<span style="font-size:9px;font-weight:700;background:var(--accent-amber-dim);color:var(--accent-amber);padding:2px 5px;border-radius:3px;margin-left:4px;font-family:monospace">HIGH GAP</span>`
-                                            : "",
-                                    ].join("");
+
+                                    const flags =
+                                        e.jobTitle === "Returns Clerk"
+                                            ? isReturnsClerkFlagged
+                                                ? `<span style="font-size:9px;font-weight:700;background:var(--accent-amber-dim);color:var(--accent-amber);padding:2px 5px;border-radius:3px;margin-left:6px;font-family:monospace">HIGH CT</span>`
+                                                : ""
+                                            : [
+                                                  flagLowPPH
+                                                      ? `<span style="font-size:9px;font-weight:700;background:var(--accent-red-dim);color:var(--accent-red);padding:2px 5px;border-radius:3px;margin-left:6px;font-family:monospace">LOW PPH</span>`
+                                                      : "",
+                                                  flagHighGAP
+                                                      ? `<span style="font-size:9px;font-weight:700;background:var(--accent-amber-dim);color:var(--accent-amber);padding:2px 5px;border-radius:3px;margin-left:4px;font-family:monospace">HIGH GAP</span>`
+                                                      : "",
+                                              ].join("");
+
+                                    // Color logic — no activity = muted, otherwise green/red based on threshold
+                                    const pphColor = noActivity
+                                        ? "var(--text-muted)"
+                                        : avgPPH < 100
+                                          ? "var(--accent-red)"
+                                          : "var(--accent-green)";
+                                    const bpphColor = noActivity
+                                        ? "var(--text-muted)"
+                                        : bestPPH < 100
+                                          ? "var(--accent-red)"
+                                          : "var(--accent-green)";
+                                    const gapColor = noActivity
+                                        ? "var(--text-muted)"
+                                        : avgGAP > 0.1
+                                          ? "var(--accent-red)"
+                                          : avgGAP > 0.06
+                                            ? "var(--accent-amber)"
+                                            : "var(--accent-green)";
 
                                     return `<tr style="cursor:pointer;${rowBg}" onclick="goToEmployee('${e.name.replace(/'/g, "\\'")}','manager')">
         <td class="mono" style="color:var(--text-muted)">${i + 1}</td>
         <td style="color:var(--text-primary);font-weight:500">${e.name}${flags}</td>
-        <td class="mono" style="color:${flagLowPPH ? "var(--accent-red)" : "var(--accent-cyan)"};font-weight:600">${avgPPH.toFixed(1)}</td>
-        <td class="mono" style="color:var(--accent-green)">${bestPPH.toFixed(1)}</td>
+        <td class="mono" style="color:${pphColor};font-weight:600">${avgPPH.toFixed(1)}</td>
+        <td class="mono" style="color:${bpphColor}">${bestPPH.toFixed(1)}</td>
         <td class="mono" style="color:${gapColor}">${(avgGAP * 100).toFixed(1)}%</td>
         <td class="mono">${dirHrs.toFixed(1)}</td>
         <td class="mono">${indHrs.toFixed(1)}</td>
@@ -5310,7 +5385,7 @@
       <td style="color:var(--text-primary);font-weight:500">${r["EMPLOYEE"]}</td>
       <td>${r["SUPERVISOR"] || "—"}</td>
       <td><span class="location-tag">${r["LOCATION"] || "—"}</span></td>
-      <td class="mono" style="color:var(--accent-cyan);font-weight:600">${pph.toFixed(1)}</td>
+      <td class="mono" style="color:${pph >= 100 ? "var(--accent-green)" : "var(--accent-red)"};font-weight:600">${pph.toFixed(1)}</td>
       <td class="mono" style="color:${gapColor}">${(gap * 100).toFixed(1)}%</td>
       <td class="mono">${(parseFloat(r["DIRECT HOURS"]) || 0).toFixed(1)}</td>
       <td class="mono">${(parseFloat(r["INDIRECT HOURS"]) || 0).toFixed(1)}</td>
@@ -6576,23 +6651,45 @@
                 const valid = stats.filter((s) => s.avgCycle > 0);
                 if (!valid.length) return;
 
+                // Consolidate by employee — weighted avg across all actions
+                const empMap = {};
+                valid.forEach((s) => {
+                    if (!empMap[s.employee])
+                        empMap[s.employee] = { totalWeighted: 0, totalComp: 0 };
+                    empMap[s.employee].totalWeighted +=
+                        s.avgCycle * s.totalCompletions;
+                    empMap[s.employee].totalComp += s.totalCompletions;
+                });
+                const consolidated = Object.entries(empMap)
+                    .map(([emp, d]) => ({
+                        employee: emp,
+                        avgCycle:
+                            d.totalComp > 0 ? d.totalWeighted / d.totalComp : 0,
+                    }))
+                    .filter((e) => e.avgCycle > 0)
+                    .sort((a, b) => a.avgCycle - b.avgCycle);
+
                 const deptAvg =
-                    valid.reduce((a, b) => a + b.avgCycle, 0) / valid.length;
-                const labels = valid.map((s) =>
-                    s.employee
+                    consolidated.reduce((a, b) => a + b.avgCycle, 0) /
+                    consolidated.length;
+                const labels = consolidated.map((e) =>
+                    e.employee
                         .split(" ")
                         .map((w, i) => (i === 0 ? w : w[0] + "."))
                         .join(" "),
                 );
-                const data = valid.map((s) =>
-                    parseFloat(s.avgCycle.toFixed(2)),
+                const data = consolidated.map((e) =>
+                    parseFloat(e.avgCycle.toFixed(2)),
                 );
                 const barColors = data.map((v) =>
                     v <= deptAvg ? COLORS.green + "cc" : COLORS.amber + "cc",
                 );
 
                 // Canvas height scales to employee count inside the fixed 380px scroll container
-                const canvasHeight = Math.max(380, valid.length * 28 + 60);
+                const canvasHeight = Math.max(
+                    380,
+                    consolidated.length * 28 + 60,
+                );
                 const wrap = document.getElementById("ct-bar-wrap");
                 const canvas = document.getElementById("ct-bar-chart");
                 canvas.style.height = canvasHeight + "px";
@@ -6759,29 +6856,98 @@
                     ["#3d1b1b", "#f85149"],
                     ["#0d2a2a", "#39d0d0"],
                 ];
-                const deptAvg =
-                    stats
-                        .filter((s) => s.avgCycle > 0)
-                        .reduce((a, b) => a + b.avgCycle, 0) /
-                    (stats.filter((s) => s.avgCycle > 0).length || 1);
-                const maxAvg = Math.max(...stats.map((s) => s.avgCycle));
+
+                // Consolidate stats by employee — one card per employee with all actions merged
+                const empMap = {};
+                stats.forEach((s) => {
+                    if (!empMap[s.employee])
+                        empMap[s.employee] = {
+                            employee: s.employee,
+                            jobTitle: s.jobTitle,
+                            supervisor: s.supervisor,
+                            actions: [],
+                        };
+                    empMap[s.employee].actions.push(s);
+                });
+                const empList = Object.values(empMap).sort((a, b) => {
+                    // Sort by overall weighted avg (same as current sort order intent)
+                    const avgA =
+                        a.actions.reduce(
+                            (sum, s) => sum + s.avgCycle * s.totalCompletions,
+                            0,
+                        ) /
+                        (a.actions.reduce(
+                            (sum, s) => sum + s.totalCompletions,
+                            0,
+                        ) || 1);
+                    const avgB =
+                        b.actions.reduce(
+                            (sum, s) => sum + s.avgCycle * s.totalCompletions,
+                            0,
+                        ) /
+                        (b.actions.reduce(
+                            (sum, s) => sum + s.totalCompletions,
+                            0,
+                        ) || 1);
+                    return avgA - avgB;
+                });
+
+                // Dept-wide avg across all stats for vs comparison
+                const validStats = stats.filter((s) => s.avgCycle > 0);
+                const deptAvg = validStats.length
+                    ? validStats.reduce(
+                          (a, b) => a + b.avgCycle * b.totalCompletions,
+                          0,
+                      ) / validStats.reduce((a, b) => a + b.totalCompletions, 0)
+                    : 0;
+                const maxAvg = Math.max(
+                    ...empList.map((e) => {
+                        const totComp = e.actions.reduce(
+                            (s, a) => s + a.totalCompletions,
+                            0,
+                        );
+                        return totComp > 0
+                            ? e.actions.reduce(
+                                  (s, a) => s + a.avgCycle * a.totalCompletions,
+                                  0,
+                              ) / totComp
+                            : 0;
+                    }),
+                );
 
                 document.getElementById("ct-employee-grid").innerHTML =
-                    stats
-                        .map((s, i) => {
+                    empList
+                        .map((e, i) => {
                             const [bg, fg] =
                                 avatarPairs[i % avatarPairs.length];
+                            const totComp = e.actions.reduce(
+                                (s, a) => s + a.totalCompletions,
+                                0,
+                            );
+                            const totExcl = e.actions.reduce(
+                                (s, a) => s + a.excluded,
+                                0,
+                            );
+                            const overallAvg =
+                                totComp > 0
+                                    ? e.actions.reduce(
+                                          (s, a) =>
+                                              s +
+                                              a.avgCycle * a.totalCompletions,
+                                          0,
+                                      ) / totComp
+                                    : 0;
                             const barPct =
                                 maxAvg > 0
-                                    ? ((s.avgCycle / maxAvg) * 100).toFixed(1)
+                                    ? ((overallAvg / maxAvg) * 100).toFixed(1)
                                     : 0;
                             const barColor =
-                                s.avgCycle <= deptAvg
+                                overallAvg <= deptAvg
                                     ? COLORS.green
                                     : COLORS.amber;
                             const vsAvg =
                                 deptAvg > 0
-                                    ? ((s.avgCycle - deptAvg) / deptAvg) * 100
+                                    ? ((overallAvg - deptAvg) / deptAvg) * 100
                                     : 0;
                             const vsLabel =
                                 vsAvg === 0
@@ -6795,48 +6961,77 @@
                                     : vsAvg > 0
                                       ? "var(--accent-amber)"
                                       : "var(--text-muted)";
+                            const cardId = `ct-card-${i}`;
 
-                            return `<div class="ct-emp-card">
+                            // Per-action breakdown rows for expanded view
+                            const actionRows = e.actions
+                                .map((a) => {
+                                    const aVsAvg =
+                                        deptAvg > 0
+                                            ? ((a.avgCycle - deptAvg) /
+                                                  deptAvg) *
+                                              100
+                                            : 0;
+                                    const aVsColor =
+                                        aVsAvg < 0
+                                            ? "var(--accent-green)"
+                                            : aVsAvg > 0
+                                              ? "var(--accent-amber)"
+                                              : "var(--text-muted)";
+                                    const aVsLabel =
+                                        aVsAvg === 0
+                                            ? "= avg"
+                                            : aVsAvg < 0
+                                              ? `${Math.abs(aVsAvg).toFixed(1)}% faster`
+                                              : `${aVsAvg.toFixed(1)}% slower`;
+                                    return `
+        <div style="padding:8px 0;border-top:1px solid var(--border)">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
+            <span style="font-size:10px;font-weight:600;color:var(--accent-cyan);font-family:'JetBrains Mono',monospace">${a.action}</span>
+            <span style="font-size:10px;font-weight:600;color:${aVsColor}">${aVsLabel}</span>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px">
+            <div><div style="font-size:8px;color:var(--text-muted);letter-spacing:0.5px">AVG</div><div style="font-size:12px;font-weight:600;color:${fg}">${fmtSec(a.avgCycle)}</div></div>
+            <div><div style="font-size:8px;color:var(--text-muted);letter-spacing:0.5px">MEDIAN</div><div style="font-size:12px;font-weight:600">${fmtSec(a.medianCycle)}</div></div>
+            <div><div style="font-size:8px;color:var(--text-muted);letter-spacing:0.5px">FASTEST</div><div style="font-size:12px;font-weight:600;color:var(--accent-green)">${fmtSec(a.minCycle)}</div></div>
+            <div><div style="font-size:8px;color:var(--text-muted);letter-spacing:0.5px">SLOWEST</div><div style="font-size:12px;font-weight:600;color:var(--accent-red)">${fmtSec(a.maxCycle)}</div></div>
+          </div>
+          <div style="font-size:10px;color:var(--text-muted);margin-top:4px">${a.totalCompletions} completions · ${a.excluded} gaps excl.</div>
+        </div>`;
+                                })
+                                .join("");
+
+                            return `<div class="ct-emp-card" style="cursor:pointer" onclick="toggleCTCard('${cardId}')">
       <div class="ct-emp-header">
-        <div class="emp-avatar" style="background:${bg};color:${fg};width:34px;height:34px;font-size:12px">${getInitials(s.employee)}</div>
+        <div class="emp-avatar" style="background:${bg};color:${fg};width:34px;height:34px;font-size:12px">${getInitials(e.employee)}</div>
         <div style="flex:1">
-          <div style="font-size:13px;font-weight:600;color:var(--text-primary)">${s.employee}</div>
-          <div style="font-size:10px;color:var(--accent-cyan);font-family:'JetBrains Mono',monospace;margin-bottom:1px">${s.action}</div>
-          <div style="font-size:11px;color:var(--text-muted)">${s.jobTitle || "—"} · ${s.supervisor}</div>
+          <div style="font-size:13px;font-weight:600;color:var(--text-primary)">${e.employee}</div>
+          <div style="font-size:11px;color:var(--text-muted)">${e.jobTitle || "—"} · ${e.supervisor}</div>
+          <div style="font-size:10px;color:var(--text-muted);margin-top:1px">${e.actions.length} action${e.actions.length > 1 ? "s" : ""} · tap to expand</div>
         </div>
         <span style="font-size:11px;font-weight:600;color:${vsColor}">${vsLabel}</span>
       </div>
       <div class="ct-emp-stats">
-        <div>
-          <div class="ct-stat-label">Avg</div>
-          <div class="ct-stat-val" style="color:${fg}">${fmtSec(s.avgCycle)}</div>
-        </div>
-        <div>
-          <div class="ct-stat-label">Median</div>
-          <div class="ct-stat-val">${fmtSec(s.medianCycle)}</div>
-        </div>
-        <div>
-          <div class="ct-stat-label">Fastest</div>
-          <div class="ct-stat-val" style="color:var(--accent-green)">${fmtSec(s.minCycle)}</div>
-        </div>
-        <div>
-          <div class="ct-stat-label">Slowest</div>
-          <div class="ct-stat-val" style="color:var(--accent-red)">${fmtSec(s.maxCycle)}</div>
-        </div>
+        <div><div class="ct-stat-label">Overall Avg</div><div class="ct-stat-val" style="color:${fg}">${fmtSec(overallAvg)}</div></div>
+        <div><div class="ct-stat-label">Completions</div><div class="ct-stat-val">${totComp.toLocaleString()}</div></div>
+        <div><div class="ct-stat-label">Actions</div><div class="ct-stat-val">${e.actions.length}</div></div>
+        <div><div class="ct-stat-label">Gaps Excl.</div><div class="ct-stat-val" style="color:var(--text-muted)">${totExcl}</div></div>
       </div>
       <div class="ct-mini-bar-wrap">
-        <div class="ct-mini-bar-track">
-          <div class="ct-mini-bar-fill" style="width:${barPct}%;background:${barColor}"></div>
-        </div>
-        <div class="ct-mini-labels">
-          <span>${s.totalCompletions} completions</span>
-          <span>${s.excluded} gaps excl.</span>
-        </div>
+        <div class="ct-mini-bar-track"><div class="ct-mini-bar-fill" style="width:${barPct}%;background:${barColor}"></div></div>
       </div>
+      <div id="${cardId}" style="display:none;padding-top:4px">${actionRows}</div>
     </div>`;
                         })
                         .join("") ||
                     '<div class="no-data-msg">no employee data</div>';
+            }
+
+            function toggleCTCard(id) {
+                const el = document.getElementById(id);
+                if (!el) return;
+                el.style.display =
+                    el.style.display === "none" ? "block" : "none";
             }
 
             // ══════════════════════════════════════════
