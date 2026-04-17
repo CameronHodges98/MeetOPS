@@ -3170,21 +3170,13 @@
             let currentUserRole = "manager"; // 'admin' | 'manager'
             let currentUserSupervisor = null; // matched full supervisor name from data, null = admin
 
-            // ── Auth helpers ──
-            function userRef(path) {
-                return db
-                    .collection("users")
-                    .doc(currentUser.uid)
-                    .collection(path);
-            }
-
             // Extract first name from email: "cameron.hodges@co.com" → "cameron"
             function firstNameFromEmail(email) {
-                return (email || "")
-                    .split("@")[0]
-                    .split(".")[0]
-                    .split("_")[0]
-                    .toLowerCase();
+                // "jarod@nellisauction.com" → "jarod"
+                // "jarod.laney@nellisauction.com" → "jarod"
+                // "jarod_laney@nellisauction.com" → "jarod"
+                const local = (email || "").split("@")[0].toLowerCase();
+                return local.split(".")[0].split("_")[0];
             }
 
             // Find full supervisor name in data that matches the logged-in user's first name
@@ -3201,11 +3193,17 @@
                     ...new Set(ctRows.map((r) => r.supervisor).filter(Boolean)),
                 ];
                 const allSups = [...new Set([...perfSups, ...ctSups])];
-                return (
+
+                console.log("[MeetOPS] Matching supervisor for email:", email);
+                console.log("[MeetOPS] Extracted first name:", first);
+                console.log("[MeetOPS] Available supervisors:", allSups);
+
+                const match =
                     allSups.find(
                         (s) => s.split(" ")[0].toLowerCase() === first,
-                    ) || null
-                );
+                    ) || null;
+                console.log("[MeetOPS] Matched supervisor:", match);
+                return match;
             }
 
             // Check if user is admin (UID exists in Firestore admins collection)
@@ -3339,7 +3337,9 @@
                 for (let i = 0; i < allDays.length; i += CHUNK) {
                     const batch = db.batch();
                     for (const day of allDays.slice(i, i + CHUNK)) {
-                        const ref = userRef("performanceDays").doc(day.date);
+                        const ref = db
+                            .collection("performanceDays")
+                            .doc(day.date);
                         batch.set(ref, {
                             date: day.date,
                             filename: day.filename || "",
@@ -3357,7 +3357,9 @@
             async function loadData() {
                 if (!currentUser) return;
                 try {
-                    const snap = await userRef("performanceDays")
+                    // Data is stored globally — all users read from the same collection
+                    const snap = await db
+                        .collection("performanceDays")
                         .orderBy("date")
                         .get();
                     allDays = snap.docs.map((d) => d.data());
@@ -3369,7 +3371,7 @@
             async function deleteDayFromDB(date) {
                 if (!currentUser) return;
                 try {
-                    await userRef("performanceDays").doc(date).delete();
+                    await db.collection("performanceDays").doc(date).delete();
                 } catch (e) {}
             }
 
@@ -3395,7 +3397,8 @@
                         }
                         for (const [emp, recs] of Object.entries(byEmp)) {
                             const safeEmp = emp.replace(/[^a-zA-Z0-9_-]/g, "_");
-                            const ref = userRef("ctDays")
+                            const ref = db
+                                .collection("ctDays")
                                 .doc(day.date)
                                 .collection("employees")
                                 .doc(safeEmp);
@@ -3414,11 +3417,12 @@
                     return;
                 }
                 try {
-                    const daysSnap = await userRef("ctDays").get();
+                    const daysSnap = await db.collection("ctDays").get();
                     const result = [];
                     for (const dayDoc of daysSnap.docs) {
                         const date = dayDoc.id;
-                        const empSnap = await userRef("ctDays")
+                        const empSnap = await db
+                            .collection("ctDays")
                             .doc(date)
                             .collection("employees")
                             .get();
@@ -3643,10 +3647,20 @@
                     rows = rows.filter((r) => r.LOCATION === loc);
 
                 // Scope to manager's own employees when not admin
-                if (currentUserRole === "manager" && currentUserSupervisor) {
-                    rows = rows.filter(
-                        (r) => r["SUPERVISOR"] === currentUserSupervisor,
-                    );
+                if (currentUserRole === "manager") {
+                    // Re-attempt match if data loaded after initial resolve
+                    if (!currentUserSupervisor && currentUser) {
+                        currentUserSupervisor = matchSupervisorFromEmail(
+                            currentUser.email,
+                        );
+                    }
+                    if (currentUserSupervisor) {
+                        rows = rows.filter(
+                            (r) => r["SUPERVISOR"] === currentUserSupervisor,
+                        );
+                    } else {
+                        rows = []; // no match — return nothing rather than all data
+                    }
                 }
 
                 return rows;
@@ -4118,9 +4132,9 @@
                     for (let i = 0; i < newDays.length; i += CHUNK) {
                         const batch = db.batch();
                         for (const day of newDays.slice(i, i + CHUNK)) {
-                            const ref = userRef("performanceDays").doc(
-                                day.date,
-                            );
+                            const ref = db
+                                .collection("performanceDays")
+                                .doc(day.date);
                             batch.set(ref, {
                                 date: day.date,
                                 filename: day.filename || "",
@@ -5289,14 +5303,40 @@
                 if (!hasData) return;
 
                 // Manager role: skip selection screen, go straight to their own view
-                if (currentUserRole === "manager" && currentUserSupervisor) {
-                    activeMgrDetail = currentUserSupervisor;
-                    document.getElementById("mgr-select-screen").style.display =
-                        "none";
-                    document.getElementById("mgr-detail").style.display =
-                        "block";
-                    renderManagerDetail(currentUserSupervisor);
-                    return;
+                if (currentUserRole === "manager") {
+                    // Try re-matching in case data loaded after initial resolve
+                    if (!currentUserSupervisor && currentUser) {
+                        currentUserSupervisor = matchSupervisorFromEmail(
+                            currentUser.email,
+                        );
+                    }
+                    if (currentUserSupervisor) {
+                        activeMgrDetail = currentUserSupervisor;
+                        document.getElementById(
+                            "mgr-select-screen",
+                        ).style.display = "none";
+                        document.getElementById("mgr-detail").style.display =
+                            "block";
+                        renderManagerDetail(currentUserSupervisor);
+                        return;
+                    } else {
+                        // No match found — show a helpful message
+                        document.getElementById("mgr-select-screen").innerHTML =
+                            `
+        <div style="max-width:440px;margin:60px auto;text-align:center">
+          <div style="font-size:22px;font-weight:700;color:var(--text-primary);margin-bottom:8px">No data found</div>
+          <div style="font-size:14px;color:var(--text-muted);line-height:1.6">
+            Your account (<strong>${currentUser?.email}</strong>) could not be matched to a supervisor in the uploaded data.<br><br>
+            Make sure your first name matches exactly as it appears in the CSV, or ask an admin to check the data.
+          </div>
+        </div>`;
+                        document.getElementById(
+                            "mgr-select-screen",
+                        ).style.display = "block";
+                        document.getElementById("mgr-detail").style.display =
+                            "none";
+                        return;
+                    }
                 }
 
                 // If a manager is already selected (admin drilling in), re-render their detail
@@ -5361,35 +5401,54 @@
                     .join("");
             }
             function renderRankingTable(rows) {
-                const sorted = [...rows].sort(
-                    (a, b) =>
-                        (parseFloat(b["PPH"]) || 0) -
-                        (parseFloat(a["PPH"]) || 0),
-                );
-                const maxPPH = Math.max(
-                    ...sorted.map((r) => parseFloat(r["PPH"]) || 0),
-                );
-                document.getElementById("ranking-body").innerHTML = sorted
-                    .map((r, i) => {
-                        const pph = parseFloat(r["PPH"]) || 0;
-                        const gap = parseFloat(r["GAP %"]) || 0;
-                        const pct = maxPPH > 0 ? (pph / maxPPH) * 100 : 0;
+                // Aggregate by employee — one row per unique employee using weighted PPH
+                const empMap = {};
+                rows.forEach((r) => {
+                    const n = r["EMPLOYEE"];
+                    if (!empMap[n])
+                        empMap[n] = {
+                            name: n,
+                            supervisor: r["SUPERVISOR"] || "—",
+                            location: r["LOCATION"] || "—",
+                            rows: [],
+                        };
+                    empMap[n].rows.push(r);
+                });
+
+                const emps = Object.values(empMap)
+                    .map((e) => ({
+                        name: e.name,
+                        supervisor: e.supervisor,
+                        location: e.location,
+                        pph: weightedPPH(e.rows),
+                        gap: avg(e.rows, "GAP %"),
+                        directHrs: sum(e.rows, "DIRECT HOURS"),
+                        indirectHrs: sum(e.rows, "INDIRECT HOURS"),
+                        totalHrs: sum(e.rows, "TOTAL HOURS"),
+                    }))
+                    .sort((a, b) => b.pph - a.pph);
+
+                const maxPPH = Math.max(...emps.map((e) => e.pph), 0);
+
+                document.getElementById("ranking-body").innerHTML = emps
+                    .map((e, i) => {
+                        const pct = maxPPH > 0 ? (e.pph / maxPPH) * 100 : 0;
                         const gapColor =
-                            gap > 0.1
+                            e.gap > 0.1
                                 ? COLORS.red
-                                : gap > 0.06
+                                : e.gap > 0.06
                                   ? COLORS.amber
                                   : COLORS.green;
                         return `<tr>
       <td class="mono" style="color:var(--text-muted)">${i + 1}</td>
-      <td style="color:var(--text-primary);font-weight:500">${r["EMPLOYEE"]}</td>
-      <td>${r["SUPERVISOR"] || "—"}</td>
-      <td><span class="location-tag">${r["LOCATION"] || "—"}</span></td>
-      <td class="mono" style="color:${pph >= 100 ? "var(--accent-green)" : "var(--accent-red)"};font-weight:600">${pph.toFixed(1)}</td>
-      <td class="mono" style="color:${gapColor}">${(gap * 100).toFixed(1)}%</td>
-      <td class="mono">${(parseFloat(r["DIRECT HOURS"]) || 0).toFixed(1)}</td>
-      <td class="mono">${(parseFloat(r["INDIRECT HOURS"]) || 0).toFixed(1)}</td>
-      <td class="mono">${(parseFloat(r["TOTAL HOURS"]) || 0).toFixed(1)}</td>
+      <td style="color:var(--text-primary);font-weight:500">${e.name}</td>
+      <td>${e.supervisor}</td>
+      <td><span class="location-tag">${e.location}</span></td>
+      <td class="mono" style="color:${e.pph >= 100 ? "var(--accent-green)" : "var(--accent-red)"};font-weight:600">${e.pph.toFixed(1)}</td>
+      <td class="mono" style="color:${gapColor}">${(e.gap * 100).toFixed(1)}%</td>
+      <td class="mono">${e.directHrs.toFixed(1)}</td>
+      <td class="mono">${e.indirectHrs.toFixed(1)}</td>
+      <td class="mono">${e.totalHrs.toFixed(1)}</td>
       <td><div class="perf-bar-wrap"><div class="perf-bar" style="width:${pct.toFixed(0)}%"></div></div></td>
     </tr>`;
                     })
@@ -6347,7 +6406,7 @@
                         // First batch always includes the day metadata doc
                         let batch = db.batch();
                         let opCount = 0;
-                        batch.set(userRef("ctDays").doc(day.date), {
+                        batch.set(db.collection("ctDays").doc(day.date), {
                             date: day.date,
                             filename: day.filename,
                         });
@@ -6364,7 +6423,8 @@
                                 opCount = 0;
                             }
                             const safeEmp = emp.replace(/[^a-zA-Z0-9_-]/g, "_");
-                            const ref = userRef("ctDays")
+                            const ref = db
+                                .collection("ctDays")
                                 .doc(day.date)
                                 .collection("employees")
                                 .doc(safeEmp);
