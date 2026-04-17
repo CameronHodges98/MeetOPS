@@ -4618,16 +4618,51 @@
                 const empNames = [...new Set(rows.map((r) => r["EMPLOYEE"]))];
                 const empCount = empNames.length;
 
-                // Build per-employee stats for performance counts
+                // Build per-employee stats for performance counts (same rules as coaching panel)
                 const empStatsMap = {};
                 rows.forEach((r) => {
                     const n = r["EMPLOYEE"];
-                    if (!empStatsMap[n]) empStatsMap[n] = [];
-                    empStatsMap[n].push(r);
+                    if (!empStatsMap[n])
+                        empStatsMap[n] = {
+                            rows: [],
+                            jobTitle: r["JOB TITLE"] || "—",
+                        };
+                    empStatsMap[n].rows.push(r);
                 });
+
+                // Pre-compute dept avg for "Return Item Processed" — Returns Clerk rule (reused below)
+                const _headerCTRecords = getFilteredCTRecords();
+                const _headerIPFStats = calcCycleStats(
+                    _headerCTRecords.filter(
+                        (r) => r.action === "Return Item Processed",
+                    ),
+                    ctThreshold,
+                ).filter((s) => s.avgCycle > 0);
+                const _headerDeptIPFAvg = _headerIPFStats.length
+                    ? _headerIPFStats.reduce((a, b) => a + b.avgCycle, 0) /
+                      _headerIPFStats.length
+                    : null;
+
                 const underPerforming = empNames.filter((n) => {
-                    const er = empStatsMap[n];
-                    return weightedPPH(er) < 100 || avg(er, "GAP %") > 0.1;
+                    const e = empStatsMap[n];
+                    const ePPH = weightedPPH(e.rows);
+                    const eGAP = avg(e.rows, "GAP %");
+                    if (ePPH === 0 && eGAP === 0) return false;
+                    if (e.jobTitle === "Returns Clerk") {
+                        if (_headerDeptIPFAvg === null) return false;
+                        const empIPF = calcCycleStats(
+                            _headerCTRecords.filter(
+                                (r) =>
+                                    r.employee === n &&
+                                    r.action === "Return Item Processed",
+                            ),
+                            ctThreshold,
+                        ).filter((s) => s.avgCycle > 0);
+                        return empIPF.length
+                            ? empIPF[0].avgCycle > _headerDeptIPFAvg
+                            : false;
+                    }
+                    return ePPH < 100 || eGAP > 0.1;
                 }).length;
                 const performing = empCount - underPerforming;
 
@@ -4677,12 +4712,51 @@
                         };
                     empMapForFlags[n].rows.push(r);
                 });
+
+                // Pre-compute dept avg cycle time for "Return Item Processed" (Returns Clerk action)
+                const RETURNS_ACTION = "Return Item Processed";
+                const allCTRecords = getFilteredCTRecords();
+                const returnsIPFRecords = allCTRecords.filter(
+                    (r) => r.action === RETURNS_ACTION,
+                );
+                const returnsIPFStats = calcCycleStats(
+                    returnsIPFRecords,
+                    ctThreshold,
+                ).filter((s) => s.avgCycle > 0);
+                const deptIPFAvg = returnsIPFStats.length
+                    ? returnsIPFStats.reduce((a, b) => a + b.avgCycle, 0) /
+                      returnsIPFStats.length
+                    : null;
+
                 const flaggedEmps = Object.values(empMapForFlags)
-                    .filter(
-                        (e) =>
-                            weightedPPH(e.rows) < 100 ||
-                            avg(e.rows, "GAP %") > 0.1,
-                    )
+                    .filter((e) => {
+                        const ePPH = weightedPPH(e.rows);
+                        const eGAP = avg(e.rows, "GAP %");
+
+                        // Rule 1: zero PPH and zero GAP = no activity, skip
+                        if (ePPH === 0 && eGAP === 0) return false;
+
+                        // Rule 2: Returns Clerks — only flag if their avg cycle for Return Item Processed
+                        // exceeds the dept average for that action
+                        if (e.jobTitle === "Returns Clerk") {
+                            if (deptIPFAvg === null) return false;
+                            const empIPFRecords = allCTRecords.filter(
+                                (r) =>
+                                    r.employee === e.name &&
+                                    r.action === RETURNS_ACTION,
+                            );
+                            const empIPFStats = calcCycleStats(
+                                empIPFRecords,
+                                ctThreshold,
+                            ).filter((s) => s.avgCycle > 0);
+                            if (!empIPFStats.length) return false;
+                            const empIPFAvg = empIPFStats[0].avgCycle;
+                            return empIPFAvg > deptIPFAvg;
+                        }
+
+                        // Rule 3: Everyone else — flag if PPH < 100 or GAP > 10%
+                        return ePPH < 100 || eGAP > 0.1;
+                    })
                     .sort((a, b) => a.name.localeCompare(b.name));
 
                 const flagPanel = document.getElementById("mgr-flagged-panel");
@@ -4786,28 +4860,96 @@
                     const pphCtx = document
                         .getElementById("mgr-detail-pph")
                         .getContext("2d");
+
+                    // Linear regression for trend line
+                    const validPPH = pphData
+                        .map((d, i) => ({ x: i, y: d.pph }))
+                        .filter((p) => p.y !== null);
+                    let trendData = pphData.map(() => null);
+                    if (validPPH.length >= 2) {
+                        const n = validPPH.length;
+                        const sumX = validPPH.reduce((a, p) => a + p.x, 0);
+                        const sumY = validPPH.reduce((a, p) => a + p.y, 0);
+                        const sumXY = validPPH.reduce(
+                            (a, p) => a + p.x * p.y,
+                            0,
+                        );
+                        const sumX2 = validPPH.reduce(
+                            (a, p) => a + p.x * p.x,
+                            0,
+                        );
+                        const slope =
+                            (n * sumXY - sumX * sumY) /
+                            (n * sumX2 - sumX * sumX);
+                        const intercept = (sumY - slope * sumX) / n;
+                        trendData = pphData.map((_, i) =>
+                            parseFloat((slope * i + intercept).toFixed(2)),
+                        );
+                    }
+
+                    const trendColor = (() => {
+                        if (validPPH.length < 2) return COLORS.text;
+                        const first = trendData[0],
+                            last = trendData[trendData.length - 1];
+                        return last > first
+                            ? COLORS.green
+                            : last < first
+                              ? COLORS.red
+                              : COLORS.amber;
+                    })();
+
                     activeCharts["mgr-d-pph"] = new Chart(pphCtx, {
-                        type: "line",
+                        type: "bar",
                         data: {
                             labels: pphData.map((d) => d.date),
                             datasets: [
                                 {
+                                    type: "bar",
+                                    label: "PPH",
                                     data: pphData.map((d) => d.pph),
-                                    borderColor: mgrColor,
-                                    backgroundColor: mgrColor + "22",
+                                    backgroundColor: pphData.map((d) =>
+                                        d.pph !== null && d.pph >= 100
+                                            ? mgrColor + "99"
+                                            : "rgba(248,81,73,0.5)",
+                                    ),
+                                    borderColor: pphData.map((d) =>
+                                        d.pph !== null && d.pph >= 100
+                                            ? mgrColor
+                                            : COLORS.red,
+                                    ),
+                                    borderWidth: 1.5,
+                                    borderRadius: 3,
+                                    order: 2,
+                                },
+                                {
+                                    type: "line",
+                                    label: "Trend",
+                                    data: trendData,
+                                    borderColor: trendColor,
                                     borderWidth: 2,
-                                    pointBackgroundColor: mgrColor,
-                                    pointRadius: 4,
-                                    tension: 0.3,
-                                    fill: true,
+                                    borderDash: [5, 4],
+                                    pointRadius: 0,
+                                    tension: 0,
+                                    fill: false,
                                     spanGaps: true,
+                                    order: 1,
                                 },
                             ],
                         },
                         options: {
                             responsive: true,
                             maintainAspectRatio: false,
-                            plugins: { legend: { display: false } },
+                            plugins: {
+                                legend: { display: false },
+                                tooltip: {
+                                    callbacks: {
+                                        label: (ctx) =>
+                                            ctx.dataset.label === "Trend"
+                                                ? ` Trend: ${ctx.raw}`
+                                                : ` PPH: ${ctx.raw}`,
+                                    },
+                                },
+                            },
                             scales: {
                                 x: {
                                     ticks: {
