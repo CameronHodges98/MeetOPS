@@ -1821,7 +1821,7 @@
                     </div>
                     <div>
                         <div class="logo-text">MeetOPS</div>
-                        <div class="logo-sub">v1.0 · ANALYTICS</div>
+                        <div class="logo-sub">V1.1 · ANALYTICS</div>
                     </div>
                 </div>
                 <button
@@ -5522,6 +5522,17 @@
                             const totalHrs = sum(e.rows, "TOTAL HOURS");
                             const [bg, fg] =
                                 avatarColors[i % avatarColors.length];
+                            const noActivity = avgPPH === 0 && avgGAP === 0;
+                            const pphColor = noActivity
+                                ? "var(--text-muted)"
+                                : avgPPH >= 100
+                                  ? "var(--accent-green)"
+                                  : "var(--accent-red)";
+                            const gapColor = noActivity
+                                ? "var(--text-muted)"
+                                : avgGAP <= 0.1
+                                  ? "var(--accent-green)"
+                                  : "var(--accent-red)";
                             return `<div class="emp-card" onclick="showEmployeeDetail('${e.name.replace(/'/g, "\\'")}')">
       <div class="emp-card-header">
         <div class="emp-avatar" style="background:${bg};color:${fg}">${getInitials(e.name)}</div>
@@ -5533,11 +5544,11 @@
       <div class="emp-stats">
         <div class="emp-stat-box">
           <div class="emp-stat-label">Avg PPH</div>
-          <div class="emp-stat-val" style="color:${fg}">${avgPPH.toFixed(1)}</div>
+          <div class="emp-stat-val" style="color:${pphColor}">${avgPPH.toFixed(1)}</div>
         </div>
         <div class="emp-stat-box">
           <div class="emp-stat-label">GAP%</div>
-          <div class="emp-stat-val">${(avgGAP * 100).toFixed(1)}%</div>
+          <div class="emp-stat-val" style="color:${gapColor}">${(avgGAP * 100).toFixed(1)}%</div>
         </div>
         <div class="emp-stat-box" style="grid-column:1/-1">
           <div class="emp-stat-label">Total Hours (current period)</div>
@@ -5621,11 +5632,11 @@
 
                 // KPIs — all aggregated across the date range
                 document.getElementById("emp-detail-kpis").innerHTML = `
-    <div class="kpi-card cyan"><div class="kpi-label">Avg PPH</div><div class="kpi-value">${avgPPH.toFixed(1)}</div></div>
-    <div class="kpi-card green"><div class="kpi-label">Peak PPH</div><div class="kpi-value">${peakPPH.toFixed(1)}</div></div>
-    <div class="kpi-card amber"><div class="kpi-label">Avg GAP%</div><div class="kpi-value">${(avgGAP * 100).toFixed(1)}%</div></div>
+    <div class="kpi-card ${avgPPH >= 100 ? "green" : "red"}"><div class="kpi-label">Avg PPH</div><div class="kpi-value">${avgPPH.toFixed(1)}</div></div>
+    <div class="kpi-card ${peakPPH >= 100 ? "green" : "red"}"><div class="kpi-label">Peak PPH</div><div class="kpi-value">${peakPPH.toFixed(1)}</div></div>
+    <div class="kpi-card ${avgGAP <= 0.1 ? "green" : "red"}"><div class="kpi-label">Avg GAP%</div><div class="kpi-value">${(avgGAP * 100).toFixed(1)}%</div></div>
     <div class="kpi-card purple"><div class="kpi-label">Total Direct Hrs</div><div class="kpi-value">${totalDirect.toFixed(0)}h</div></div>
-    <div class="kpi-card red"><div class="kpi-label">Total Hrs</div><div class="kpi-value">${totalHrs.toFixed(0)}h</div></div>`;
+    <div class="kpi-card amber"><div class="kpi-label">Total Hrs</div><div class="kpi-value">${totalHrs.toFixed(0)}h</div></div>`;
 
                 // Charts
                 setTimeout(() => {
@@ -5772,7 +5783,7 @@
                         const pphFlag =
                             d.PPH < 100
                                 ? `style="color:var(--accent-red);font-weight:600"`
-                                : `style="font-weight:600"`;
+                                : `style="color:var(--accent-green);font-weight:600"`;
                         const gapFlag =
                             d.GAP > 0.1
                                 ? `style="color:var(--accent-red)"`
@@ -7164,6 +7175,15 @@
                 await loadCTData();
                 await resolveUserRole();
                 renderAll();
+                // Also render the active page so data shows immediately without tab switching
+                const page = getActivePage();
+                if (page === "managers") renderManagers();
+                if (page === "employees") renderEmployeeCards();
+                if (page === "trends") renderTrends();
+                if (page === "cycletime") renderCycleTime();
+                if (page === "history") renderHistory();
+                updateDateRange();
+                applyFilters();
             }
 
             // Auth handles initApp via onAuthStateChanged — no direct call needed
