@@ -3260,6 +3260,11 @@
             let currentUser = null;
             let currentUserRole = "manager"; // 'admin' | 'manager'
             let currentUserSupervisor = null; // matched full supervisor name from data, null = admin
+            // Tracks whether the user was ever signed in during this session.
+            // Used in onAuthStateChanged to distinguish a sign-out transition
+            // (wasSignedIn true → reload to clear state) from a fresh page load
+            // (wasSignedIn false → just show the login screen normally).
+            let wasSignedIn = false;
 
             // Extract first name from email: "cameron.hodges@co.com" → "cameron"
             function firstNameFromEmail(email) {
@@ -3469,6 +3474,7 @@
             // ── Show/hide app vs login screen ──
             auth.onAuthStateChanged(async (user) => {
                 if (user) {
+                    wasSignedIn = true; // mark that a real session has occurred
                     currentUser = user;
                     document.getElementById("login-screen").style.display =
                         "none";
@@ -3485,10 +3491,19 @@
                     applyStoredTheme();
                     await initApp();
                 } else {
-                    // A full reload is the cleanest teardown: it resets all JS state,
-                    // clears caches, restores browser autofill, and guarantees the next
-                    // login always starts from a blank slate regardless of who signs in.
-                    window.location.reload();
+                    if (wasSignedIn) {
+                        // User was signed in during this session and has now signed out.
+                        // A full reload is the cleanest teardown: it resets all JS state,
+                        // clears caches, restores browser autofill, and guarantees the next
+                        // login always starts from a blank slate regardless of who signs in.
+                        window.location.reload();
+                    } else {
+                        // Fresh page load with no active session — just reveal the
+                        // login screen. Reloading here would cause an infinite loop
+                        // because user === null fires immediately on every cold load.
+                        document.getElementById("login-screen").style.display =
+                            "flex";
+                    }
                 }
             });
 
@@ -3904,20 +3919,55 @@
                 return rows;
             }
 
-            // Returns {from, to} as 'YYYY-MM-DD' strings for the prior calendar week (Sun–Sat)
+            // Given any YYYY-MM-DD string, returns the Mon–Sun bounds for that
+            // calendar week AND the immediately prior Mon–Sun week.
+            function getWeekBounds(dateStr) {
+                const [y, mo, d] = dateStr.split("-").map(Number);
+                const date = new Date(y, mo - 1, d);
+                const dow = date.getDay();
+                const offsetToMonday = dow === 0 ? 6 : dow - 1;
+
+                const curMon = new Date(date);
+                curMon.setDate(date.getDate() - offsetToMonday);
+                const curSun = new Date(curMon);
+                curSun.setDate(curMon.getDate() + 6);
+
+                const priorMon = new Date(curMon);
+                priorMon.setDate(curMon.getDate() - 7);
+                const priorSun = new Date(priorMon);
+                priorSun.setDate(priorMon.getDate() + 6);
+
+                const fmt = (dt) => dt.toLocaleDateString("sv");
+                return {
+                    current: { from: fmt(curMon), to: fmt(curSun) },
+                    prior:   { from: fmt(priorMon), to: fmt(priorSun) }
+                };
+            }
+
+            // Backwards-compatible wrapper — existing callers (updateDateRange,
+            // resetDateRange) continue to work without modification.
             function getPriorWeekRange() {
-                const today = new Date();
-                const dayOfWeek = today.getDay(); // 0=Sun, 6=Sat
-                // Start of current week (Sunday)
-                const startOfCurrentWeek = new Date(today);
-                startOfCurrentWeek.setDate(today.getDate() - dayOfWeek);
-                // Prior week: 7 days before start of current week
-                const priorSun = new Date(startOfCurrentWeek);
-                priorSun.setDate(priorSun.getDate() - 7);
-                const priorSat = new Date(priorSun);
-                priorSat.setDate(priorSat.getDate() + 6);
-                const fmt = (d) => d.toISOString().split("T")[0];
-                return { from: fmt(priorSun), to: fmt(priorSat) };
+                const { prior } = getWeekBounds(new Date().toLocaleDateString("sv"));
+                return { from: prior.from, to: prior.to };
+            }
+
+            // Returns the filtered row set for the week prior to toDateStr.
+            // Applies the same location and manager-role filters as the main view.
+            function getPriorWeekRows(toDateStr) {
+                const { prior } = getWeekBounds(toDateStr);
+                const days = allDays.filter(d => d.date >= prior.from && d.date <= prior.to);
+                if (!days.length) return [];
+
+                let rows = days.flatMap(d => d.rows);
+                const loc = document.getElementById("location-filter").value;
+                if (loc !== "all") rows = rows.filter(r => r.LOCATION === loc);
+
+                if (currentUserRole === "manager") {
+                    rows = currentUserSupervisor
+                        ? rows.filter(r => r["SUPERVISOR"] === currentUserSupervisor)
+                        : [];
+                }
+                return rows;
             }
 
             function updateDateRange() {
@@ -4569,89 +4619,45 @@
             }
 
             function renderKPIs(rows) {
-                let prevRows = [];
-                if (allDays.length >= 2) {
-                    const loc =
-                        document.getElementById("location-filter").value;
-                    prevRows =
-                        loc === "all"
-                            ? allDays[allDays.length - 2].rows
-                            : allDays[allDays.length - 2].rows.filter(
-                                  (r) => r.LOCATION === loc,
-                              );
-                }
+                // Compare current view against the full prior calendar week
+                // (Mon–Sun before the week containing the "date-to" picker value).
+                const toDateStr = document.getElementById("date-to").value;
+                const prevRows = toDateStr ? getPriorWeekRows(toDateStr) : [];
 
                 const metrics = [
-                    {
-                        label: "Avg PPH",
-                        key: "PPH",
-                        format: (v) => v.toFixed(1),
-                        color: "cyan",
-                        icon: "▲",
-                    },
-                    {
-                        label: "Avg GAP%",
-                        key: "GAP %",
-                        format: (v) => (v * 100).toFixed(1) + "%",
-                        color: "amber",
-                        icon: "⊘",
-                    },
-                    {
-                        label: "Direct Hours",
-                        key: "DIRECT HOURS",
-                        format: (v) => v.toFixed(0) + "h",
-                        color: "green",
-                        icon: "◈",
-                        agg: "sum",
-                    },
-                    {
-                        label: "Indirect Hours",
-                        key: "INDIRECT HOURS",
-                        format: (v) => v.toFixed(0) + "h",
-                        color: "purple",
-                        icon: "◉",
-                        agg: "sum",
-                    },
-                    {
-                        label: "Total Hours",
-                        key: "TOTAL HOURS",
-                        format: (v) => v.toFixed(0) + "h",
-                        color: "red",
-                        icon: "⬡",
-                        agg: "sum",
-                    },
+                    { label: "Avg PPH",        key: "PPH",            format: v => v.toFixed(1),           color: "cyan",   icon: "▲", goodUp: true  },
+                    { label: "Avg GAP%",       key: "GAP %",          format: v => (v*100).toFixed(1)+"%", color: "amber",  icon: "⊘", goodUp: false },
+                    { label: "Direct Hours",   key: "DIRECT HOURS",   format: v => v.toFixed(0)+"h",       color: "green",  icon: "◈", agg: "sum", goodUp: true },
+                    { label: "Indirect Hours", key: "INDIRECT HOURS", format: v => v.toFixed(0)+"h",       color: "purple", icon: "◉", agg: "sum", goodUp: true },
+                    { label: "Total Hours",    key: "TOTAL HOURS",    format: v => v.toFixed(0)+"h",       color: "red",    icon: "⬡", agg: "sum", goodUp: true },
                 ];
 
-                document.getElementById("kpi-grid").innerHTML = metrics
-                    .map((m) => {
-                        const cur =
-                            m.agg === "sum"
-                                ? sum(rows, m.key)
-                                : m.key === "PPH"
-                                  ? weightedPPH(rows)
-                                  : avg(rows, m.key);
-                        const prev = prevRows.length
-                            ? m.agg === "sum"
-                                ? sum(prevRows, m.key)
-                                : m.key === "PPH"
-                                  ? weightedPPH(prevRows)
-                                  : avg(prevRows, m.key)
-                            : null;
-                        let deltaHtml =
-                            '<span class="kpi-delta neutral">— no prior day</span>';
-                        if (prev !== null && prev > 0) {
-                            const pct = ((cur - prev) / prev) * 100;
-                            const dir = pct >= 0 ? "up" : "down";
-                            const sign = pct >= 0 ? "+" : "";
-                            deltaHtml = `<span class="kpi-delta ${dir}">${dir === "up" ? "↑" : "↓"} ${sign}${pct.toFixed(1)}% vs prev</span>`;
-                        }
-                        return `<div class="kpi-card ${m.color}">
-      <div class="kpi-label">${m.label}</div>
-      <div class="kpi-value">${m.format(cur)}</div>
-      ${deltaHtml}
-    </div>`;
-                    })
-                    .join("");
+                function computeAgg(rowSet, m) {
+                    if (m.agg === "sum") return sum(rowSet, m.key);
+                    if (m.key === "PPH") return weightedPPH(rowSet);
+                    return avg(rowSet, m.key);
+                }
+
+                document.getElementById("kpi-grid").innerHTML = metrics.map(m => {
+                    const cur  = computeAgg(rows, m);
+                    const prev = prevRows.length ? computeAgg(prevRows, m) : null;
+
+                    let deltaHtml = '<span class="kpi-delta neutral">— no prior week</span>';
+                    if (prev !== null && prev > 0) {
+                        const pct      = ((cur - prev) / prev) * 100;
+                        const isUp     = pct >= 0;
+                        const cssClass = isUp ? (m.goodUp ? "up" : "down") : (m.goodUp ? "down" : "up");
+                        const arrow    = isUp ? "↑" : "↓";
+                        const sign     = isUp ? "+" : "";
+                        deltaHtml = `<span class="kpi-delta ${cssClass}">${arrow} ${sign}${pct.toFixed(1)}% vs prior week</span>`;
+                    }
+
+                    return `<div class="kpi-card ${m.color}">
+  <div class="kpi-label">${m.label}</div>
+  <div class="kpi-value">${m.format(cur)}</div>
+  ${deltaHtml}
+</div>`;
+                }).join("");
             }
 
             // ══════════════════════════════════════════
