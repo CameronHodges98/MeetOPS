@@ -3177,6 +3177,34 @@
             </div>
         </div>
 
+        <!-- CSV UPLOAD PREVIEW MODAL -->
+        <!-- Shown before committing any parsed CSV data to Firestore.
+             Populated by showUploadPreview(); confirmed by confirmUploadPreview(). -->
+        <div
+            id="upload-preview-overlay"
+            style="
+                display: none;
+                position: fixed;
+                inset: 0;
+                background: rgba(0, 0, 0, 0.75);
+                z-index: 300;
+                align-items: center;
+                justify-content: center;
+            "
+        >
+            <div class="upload-modal" style="width: 540px; max-height: 80vh; overflow-y: auto">
+                <div class="modal-title" id="preview-modal-title">Upload Preview</div>
+                <div class="modal-sub" id="preview-modal-sub"></div>
+                <div id="preview-modal-body" style="margin-bottom: 16px"></div>
+                <div class="modal-actions">
+                    <button class="btn-secondary" onclick="cancelUploadPreview()">Cancel</button>
+                    <button class="btn-primary" id="preview-confirm-btn" onclick="confirmUploadPreview()">
+                        Confirm Import
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <script>
             let allDays = [];
             let pendingFiles = [];
@@ -4253,12 +4281,108 @@
                 }));
             }
 
+            // ══════════════════════════════════════════
+            // UPLOAD PREVIEW INFRASTRUCTURE
+            // ══════════════════════════════════════════
+
+            // Parsed data waiting for user confirmation before writing to Firestore.
+            // Set by showUploadPreview(); consumed by confirmUploadPreview().
+            let _pendingParsedDays = null;    // Array of {date, filename, rows} for perf upload
+            let _pendingParsedCTDays = null;  // Array of {date, filename, records} for CT upload
+            let _previewType = null;          // 'perf' | 'ct'
+
+            // Build and display the preview modal.
+            // parseResults = { days: [{date, filename, rows|records}], errors: [string] }
+            // type = 'perf' | 'ct'
+            function showUploadPreview(parseResults, type) {
+                const { days, errors } = parseResults;
+                _previewType = type;
+
+                const totalRows = type === 'perf'
+                    ? days.reduce((s, d) => s + d.rows.length, 0)
+                    : days.reduce((s, d) => s + d.records.length, 0);
+                const unit = type === 'perf' ? 'employees' : 'records';
+                const title = type === 'perf'
+                    ? 'Performance Data Preview'
+                    : 'Cycle Time Data Preview';
+
+                document.getElementById('preview-modal-title').textContent = title;
+                document.getElementById('preview-modal-sub').textContent =
+                    'Review what will be imported before saving to Firestore.';
+
+                // Build summary rows
+                const dayRows = days.map((d) => {
+                    const count = type === 'perf' ? d.rows.length : d.records.length;
+                    const overwrite = type === 'perf'
+                        ? allDays.some((e) => e.date === d.date)
+                        : ctDays.some((e) => e.date === d.date);
+                    return `<tr>
+                        <td style="font-family:monospace;color:var(--accent-cyan);padding:4px 8px">${d.date}</td>
+                        <td style="padding:4px 8px;color:var(--text-secondary)">${d.filename}</td>
+                        <td style="padding:4px 8px;color:var(--text-secondary);text-align:right">${count} ${unit}</td>
+                        <td style="padding:4px 8px;font-size:11px;color:${overwrite ? 'var(--accent-orange,#fb923c)' : 'var(--accent-green)'}">${overwrite ? 'overwrite' : 'new'}</td>
+                    </tr>`;
+                }).join('');
+
+                // Build error/warning rows
+                const errorHtml = errors.length
+                    ? `<div style="margin-top:12px;border:1px solid rgba(251,146,60,0.35);border-radius:6px;padding:10px 12px;background:rgba(251,146,60,0.07)">
+                         <div style="font-size:11.5px;font-weight:700;color:var(--accent-orange,#fb923c);margin-bottom:6px">Warnings (${errors.length})</div>
+                         ${errors.map((e) => `<div style="font-size:11.5px;color:var(--text-muted);margin-bottom:3px">• ${e}</div>`).join('')}
+                       </div>`
+                    : '';
+
+                const canConfirm = days.length > 0;
+                document.getElementById('preview-confirm-btn').disabled = !canConfirm;
+                document.getElementById('preview-confirm-btn').style.opacity = canConfirm ? '1' : '0.4';
+
+                document.getElementById('preview-modal-body').innerHTML = `
+                    <div style="margin-bottom:8px;font-size:12px;color:var(--text-muted)">
+                        <strong style="color:var(--text-primary)">${days.length}</strong> date(s) ·
+                        <strong style="color:var(--text-primary)">${totalRows.toLocaleString()}</strong> total ${unit}
+                    </div>
+                    <table style="width:100%;border-collapse:collapse;background:var(--bg-surface);border:1px solid var(--border);border-radius:6px;overflow:hidden;font-size:12px">
+                        <thead>
+                            <tr style="border-bottom:1px solid var(--border)">
+                                <th style="padding:6px 8px;text-align:left;color:var(--text-muted);font-weight:600">Date</th>
+                                <th style="padding:6px 8px;text-align:left;color:var(--text-muted);font-weight:600">File</th>
+                                <th style="padding:6px 8px;text-align:right;color:var(--text-muted);font-weight:600">Count</th>
+                                <th style="padding:6px 8px;text-align:left;color:var(--text-muted);font-weight:600">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>${dayRows || '<tr><td colspan="4" style="padding:12px;text-align:center;color:var(--text-muted)">No valid data found in selected files</td></tr>'}</tbody>
+                    </table>
+                    ${errorHtml}`;
+
+                document.getElementById('upload-preview-overlay').style.display = 'flex';
+            }
+
+            function cancelUploadPreview() {
+                document.getElementById('upload-preview-overlay').style.display = 'none';
+                _pendingParsedDays = null;
+                _pendingParsedCTDays = null;
+                _previewType = null;
+            }
+
+            function confirmUploadPreview() {
+                document.getElementById('upload-preview-overlay').style.display = 'none';
+                if (_previewType === 'perf' && _pendingParsedDays) {
+                    executeUpload(_pendingParsedDays);
+                } else if (_previewType === 'ct' && _pendingParsedCTDays) {
+                    executeCTUpload(_pendingParsedCTDays);
+                }
+                _pendingParsedDays = null;
+                _pendingParsedCTDays = null;
+                _previewType = null;
+            }
+
+            // ── Performance upload: phase 1 — parse and preview ──
+            // Replaces the old single-step processUpload().
             async function processUpload() {
                 if (!pendingFiles.length) return;
 
-                let totalDays = 0;
-                let totalRows = 0;
-                const newDays = []; // collect new/updated days to batch-save
+                const days = [];
+                const errors = [];
 
                 for (const file of pendingFiles) {
                     const text = await file.text();
@@ -4268,37 +4392,50 @@
                             text,
                             parseDateFromFilename(file.name),
                         );
+                        let fileHadRows = false;
                         for (const { date, rows } of parsed) {
                             if (!rows.length) continue;
-                            const existing = allDays.findIndex(
-                                (d) => d.date === date,
-                            );
-                            const dayObj = { date, filename: file.name, rows };
-                            if (existing >= 0) allDays[existing] = dayObj;
-                            else allDays.push(dayObj);
-                            newDays.push(dayObj);
-                            totalDays++;
-                            totalRows += rows.length;
+                            days.push({ date, filename: file.name, rows });
+                            fileHadRows = true;
+                        }
+                        if (!fileHadRows) {
+                            errors.push(`${file.name}: no valid rows found after parsing`);
                         }
                     } else {
                         const rows = parseFlatCSV(text);
-                        if (!rows.length) continue;
+                        if (!rows.length) {
+                            errors.push(`${file.name}: no valid rows found after parsing`);
+                            continue;
+                        }
                         const date = parseDateFromFilename(file.name);
-                        const existing = allDays.findIndex(
-                            (d) => d.date === date,
-                        );
-                        const dayObj = { date, filename: file.name, rows };
-                        if (existing >= 0) allDays[existing] = dayObj;
-                        else allDays.push(dayObj);
-                        newDays.push(dayObj);
-                        totalDays++;
-                        totalRows += rows.length;
+                        const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+                        if (!DATE_RE.test(date)) {
+                            errors.push(`${file.name}: could not determine a date — rename the file to YYYY-MM-DD.csv`);
+                        }
+                        days.push({ date, filename: file.name, rows });
                     }
                 }
 
+                if (!days.length && !errors.length) {
+                    errors.push('No data could be parsed from the selected files.');
+                }
+
+                _pendingParsedDays = days;
+                showUploadPreview({ days, errors }, 'perf');
+            }
+
+            // ── Performance upload: phase 2 — execute confirmed save ──
+            async function executeUpload(newDays) {
+                allDays = allDays.filter(
+                    (d) => !newDays.some((n) => n.date === d.date),
+                );
+                for (const day of newDays) allDays.push(day);
                 allDays.sort((a, b) => a.date.localeCompare(b.date));
 
-                // Save only the new/changed days to Firestore in chunks of 400
+                let totalDays = newDays.length;
+                let totalRows = newDays.reduce((s, d) => s + d.rows.length, 0);
+
+                // Save to Firestore in chunks of 400 (well under the 500-op batch limit)
                 if (newDays.length && currentUser) {
                     const CHUNK = 400;
                     for (let i = 0; i < newDays.length; i += CHUNK) {
@@ -6630,14 +6767,20 @@
                     .join("");
             }
 
+            // ── CT upload: phase 1 — parse and preview ──
             async function processCTUpload() {
                 if (!ctPendingFiles.length) return;
-                const newCTDays = [];
+
+                const days = [];
+                const errors = [];
 
                 for (const file of ctPendingFiles) {
                     const text = await file.text();
                     const records = parseCTCSV(text);
-                    if (!records.length) continue;
+                    if (!records.length) {
+                        errors.push(`${file.name}: no valid cycle time records found`);
+                        continue;
+                    }
 
                     const byDate = {};
                     for (const r of records) {
@@ -6646,21 +6789,32 @@
                         byDate[date].push(r);
                     }
 
+                    const fileDates = Object.keys(byDate);
+                    if (!fileDates.length) {
+                        errors.push(`${file.name}: no dates found in parsed records`);
+                        continue;
+                    }
+
                     for (const [date, dateRecords] of Object.entries(byDate)) {
-                        const dayObj = {
-                            date,
-                            filename: file.name,
-                            records: dateRecords,
-                        };
-                        const existing = ctDays.findIndex(
-                            (d) => d.date === date,
-                        );
-                        if (existing >= 0) ctDays[existing] = dayObj;
-                        else ctDays.push(dayObj);
-                        newCTDays.push(dayObj);
+                        days.push({ date, filename: file.name, records: dateRecords });
                     }
                 }
 
+                if (!days.length && !errors.length) {
+                    errors.push('No cycle time data could be parsed from the selected files.');
+                }
+
+                _pendingParsedCTDays = days;
+                showUploadPreview({ days, errors }, 'ct');
+            }
+
+            // ── CT upload: phase 2 — execute confirmed save ──
+            async function executeCTUpload(newCTDays) {
+                // Merge into ctDays in memory
+                ctDays = ctDays.filter(
+                    (d) => !newCTDays.some((n) => n.date === d.date),
+                );
+                for (const day of newCTDays) ctDays.push(day);
                 ctDays.sort((a, b) => a.date.localeCompare(b.date));
 
                 // Save new CT days to Firestore — chunked into batches of 400 (Firestore limit is 500)
