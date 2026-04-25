@@ -4476,11 +4476,15 @@
                 };
             }
 
-            // Backwards-compatible wrapper — existing callers (updateDateRange,
-            // resetDateRange) continue to work without modification.
+            // Returns the default date range: Monday of the week containing the latest
+            // uploaded date through that latest date. Using the latest available date
+            // (not today) prevents the "to" from landing on a day with no uploaded data.
             function getPriorWeekRange() {
-                const { prior } = getWeekBounds(new Date().toLocaleDateString("sv"));
-                return { from: prior.from, to: prior.to };
+                const latest = availablePerfDates.length
+                    ? availablePerfDates[availablePerfDates.length - 1]
+                    : new Date().toLocaleDateString("sv");
+                const { current } = getWeekBounds(latest);
+                return { from: current.from, to: latest };
             }
 
             // Returns rows for the prior 7-day window (current range shifted back).
@@ -4505,12 +4509,11 @@
                         fromEl.value = from;
                         toEl.value = to;
                     } else {
-                        const latest = allDates[allDates.length - 1];
-                        const weekAgo =
-                            allDates.length >= 7
-                                ? allDates[allDates.length - 7]
-                                : allDates[0];
-                        fromEl.value = weekAgo;
+                        const latest = availablePerfDates.length
+                            ? availablePerfDates[availablePerfDates.length - 1]
+                            : allDates[allDates.length - 1];
+                        const { current } = getWeekBounds(latest);
+                        fromEl.value = current.from;
                         toEl.value = latest;
                     }
                 }
@@ -4532,12 +4535,11 @@
                     document.getElementById("date-from").value = from;
                     document.getElementById("date-to").value = to;
                 } else {
-                    const latest = allDates[allDates.length - 1];
-                    const weekAgo =
-                        allDates.length >= 7
-                            ? allDates[allDates.length - 7]
-                            : allDates[0];
-                    document.getElementById("date-from").value = weekAgo;
+                    const latest = availablePerfDates.length
+                        ? availablePerfDates[availablePerfDates.length - 1]
+                        : allDates[allDates.length - 1];
+                    const { current } = getWeekBounds(latest);
+                    document.getElementById("date-from").value = current.from;
                     document.getElementById("date-to").value = latest;
                 }
                 applyFilters();
@@ -8618,21 +8620,12 @@
                     document.getElementById("date-from").value = from;
                     document.getElementById("date-to").value = to;
                 } else {
-                    // Admin: default to most recent 7 available days
-                    const allDates = [
-                        ...new Set([
-                            ...availablePerfDates,
-                            ...availableCTDates,
-                        ]),
-                    ].sort();
-                    const latest = allDates.length
-                        ? allDates[allDates.length - 1]
-                        : new Date().toISOString().split("T")[0];
-                    const week = new Date(latest);
-                    week.setDate(week.getDate() - 7);
-                    document.getElementById("date-from").value = week
-                        .toISOString()
-                        .split("T")[0];
+                    // Admin: default to Monday of the latest uploaded week through the latest date
+                    const latest = availablePerfDates.length
+                        ? availablePerfDates[availablePerfDates.length - 1]
+                        : new Date().toLocaleDateString("sv");
+                    const { current } = getWeekBounds(latest);
+                    document.getElementById("date-from").value = current.from;
                     document.getElementById("date-to").value = latest;
                 }
                 // Apply full-history bounds to pickers immediately
