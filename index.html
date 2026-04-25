@@ -3485,76 +3485,10 @@
                     applyStoredTheme();
                     await initApp();
                 } else {
-                    // ── FULL SESSION TEARDOWN ──────────────────────────────
-                    // Clear every piece of per-session state so that a new
-                    // login (possibly a different user/role) always starts
-                    // from a clean slate — identical to a hard page refresh.
-
-                    // Core identity
-                    currentUser = null;
-                    currentUserRole = "manager"; // safe default until next resolveUserRole()
-                    currentUserSupervisor = null;
-
-                    // Data arrays
-                    allDays = [];
-                    ctDays = [];
-
-                    // Caches — these are const Sets so use .clear(), not reassignment.
-                    // Without clearing these, loadData() / loadCTData() see cached date
-                    // entries and skip Firestore entirely, leaving the new user with no data.
-                    perfCache.clear();
-                    ctCache.clear();
-
-                    // Metadata date lists used by date picker bounds and history rendering
-                    availablePerfDates = [];
-                    availableCTDates = [];
-
-                    // Navigation state — reset to top-level views
-                    activeMgrDetail = null;
-                    currentEmployee = null;
-                    empNavSource = "employees";
-
-                    // Clear user badge so stale name/role isn't visible during the
-                    // brief window before the login screen fully covers the UI
-                    const _nameEl = document.getElementById("user-display-name");
-                    const _roleEl = document.getElementById("user-display-role");
-                    if (_nameEl) _nameEl.textContent = "";
-                    if (_roleEl) _roleEl.textContent = "";
-
-                    // Reset active page to dashboard so a new user always lands there
-                    document.querySelectorAll(".page").forEach((p) => p.classList.remove("active"));
-                    const dashPage = document.getElementById("page-dashboard");
-                    if (dashPage) dashPage.classList.add("active");
-                    document.querySelectorAll(".nav-item").forEach((n) => n.classList.remove("active"));
-
-                    // Reset location filter to "All Locations" (first option)
-                    const locFilter = document.getElementById("location-filter");
-                    if (locFilter) locFilter.selectedIndex = 0;
-
-                    // Reset login form to idle state before showing it.
-                    // handleLogin() hides the button and shows "Signing in..." the
-                    // moment the user clicks it. If sign-in succeeds the login screen
-                    // is immediately hidden, so that state is harmless. But on sign-out
-                    // (or a failed session restore) we return to the login screen and
-                    // must restore the button — otherwise the form is stuck with no way
-                    // to submit. Fields are cleared so the next user always sees a blank
-                    // form rather than the previous user's credentials.
-                    const _loginBtn  = document.getElementById("login-btn");
-                    const _loginLoad = document.getElementById("login-loading");
-                    const _loginErr  = document.getElementById("login-error");
-                    const _loginEmail = document.getElementById("login-email");
-                    const _loginPass  = document.getElementById("login-password");
-                    if (_loginBtn)   _loginBtn.style.display   = "block";
-                    if (_loginLoad)  _loginLoad.style.display  = "none";
-                    if (_loginErr)   { _loginErr.style.display = "none"; _loginErr.textContent = ""; }
-                    if (_loginEmail) _loginEmail.value = "";
-                    if (_loginPass)  _loginPass.value  = "";
-
-                    // Show login, hide app shell
-                    document.getElementById("login-screen").style.display = "flex";
-                    document.getElementById("sidebar").style.display = "none";
-                    document.getElementById("main").style.display = "none";
-                    document.getElementById("mobile-nav").style.display = "none";
+                    // A full reload is the cleanest teardown: it resets all JS state,
+                    // clears caches, restores browser autofill, and guarantees the next
+                    // login always starts from a blank slate regardless of who signs in.
+                    window.location.reload();
                 }
             });
 
