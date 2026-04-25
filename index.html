@@ -4794,58 +4794,70 @@
 
             function renderPPHTrendChart() {
                 destroyChart("pph-trend");
-                const loc = document.getElementById("location-filter").value;
-                const labels = allDays.map((d) => d.date);
-                const data = allDays.map((d) => {
-                    const rows =
-                        loc === "all"
-                            ? d.rows
-                            : d.rows.filter((r) => r.LOCATION === loc);
-                    return parseFloat(weightedPPH(rows).toFixed(2));
-                });
 
-                const ctx = document
-                    .getElementById("chart-pph-trend")
-                    .getContext("2d");
+                const from = document.getElementById("date-from").value;
+                const to   = document.getElementById("date-to").value;
+                if (!from || !to) return;
+
+                const daysInRange = allDays.filter(d => d.date >= from && d.date <= to);
+
+                const weekMap = new Map();
+
+                for (const day of daysInRange) {
+                    const { current } = getWeekBounds(day.date);
+                    const key = current.from;
+
+                    if (!weekMap.has(key)) {
+                        const [y, mo, d] = key.split("-").map(Number);
+                        const dt = new Date(y, mo - 1, d);
+                        const label = dt.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+                        weekMap.set(key, { label, rows: [] });
+                    }
+
+                    let rows = day.rows;
+                    const loc = document.getElementById("location-filter").value;
+                    if (loc !== "all") rows = rows.filter(r => r.LOCATION === loc);
+                    if (currentUserRole === "manager" && currentUserSupervisor) {
+                        rows = rows.filter(r => r["SUPERVISOR"] === currentUserSupervisor);
+                    }
+
+                    weekMap.get(key).rows.push(...rows);
+                }
+
+                const weeks = [...weekMap.entries()]
+                    .sort(([a], [b]) => a.localeCompare(b))
+                    .map(([, { label, rows }]) => ({
+                        label,
+                        pph: parseFloat(weightedPPH(rows).toFixed(2))
+                    }));
+
+                const labels = weeks.map(w => w.label);
+                const data   = weeks.map(w => w.pph);
+
+                const ctx = document.getElementById("chart-pph-trend").getContext("2d");
                 activeCharts["pph-trend"] = new Chart(ctx, {
-                    type: "line",
+                    type: "bar",
                     data: {
                         labels,
-                        datasets: [
-                            {
-                                label: "Avg PPH",
-                                data,
-                                borderColor: COLORS.cyan,
-                                backgroundColor: "rgba(88,166,255,0.1)",
-                                borderWidth: 2,
-                                pointBackgroundColor: COLORS.cyan,
-                                pointRadius: 4,
-                                tension: 0.3,
-                                fill: true,
-                            },
-                        ],
+                        datasets: [{
+                            label: "Avg PPH",
+                            data,
+                            backgroundColor: "rgba(88,166,255,0.7)",
+                            borderColor: COLORS.cyan,
+                            borderWidth: 1,
+                            borderRadius: 4,
+                            barPercentage: 0.6,
+                        }]
                     },
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
                         plugins: { legend: { display: false } },
                         scales: {
-                            x: {
-                                ticks: {
-                                    color: COLORS.text,
-                                    font: { size: 11 },
-                                },
-                                grid: { color: "rgba(48,54,61,0.5)" },
-                            },
-                            y: {
-                                ticks: {
-                                    color: COLORS.text,
-                                    font: { size: 11 },
-                                },
-                                grid: { color: "rgba(48,54,61,0.5)" },
-                            },
-                        },
-                    },
+                            x: { ticks: { color: COLORS.text, font: { size: 11 } }, grid: { color: "rgba(48,54,61,0.5)" } },
+                            y: { ticks: { color: COLORS.text, font: { size: 11 } }, grid: { color: "rgba(48,54,61,0.5)" } }
+                        }
+                    }
                 });
             }
 
