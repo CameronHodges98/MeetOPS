@@ -3214,7 +3214,12 @@
                 return local.split(".")[0].split("_")[0];
             }
 
-            // Find full supervisor name in data that matches the logged-in user's first name
+            // Find full supervisor name(s) in data matching the logged-in user's first name.
+            // Returns { name: string|null, status: 'ok'|'no_data'|'no_match'|'ambiguous' }
+            // - ok:        exactly one match found; name is the full supervisor string
+            // - no_data:   no performance or CT data is loaded yet; cannot determine match
+            // - no_match:  data is loaded but no supervisor first name matches
+            // - ambiguous: multiple supervisors share the same first name; cannot auto-pick
             function matchSupervisorFromEmail(email) {
                 const first = firstNameFromEmail(email);
                 const allRows = allDays.flatMap((d) => d.rows);
@@ -3233,12 +3238,65 @@
                 console.log("[MeetOPS] Extracted first name:", first);
                 console.log("[MeetOPS] Available supervisors:", allSups);
 
-                const match =
-                    allSups.find(
-                        (s) => s.split(" ")[0].toLowerCase() === first,
-                    ) || null;
-                console.log("[MeetOPS] Matched supervisor:", match);
-                return match;
+                if (!allSups.length) {
+                    console.log("[MeetOPS] No supervisor data loaded yet");
+                    return { name: null, status: "no_data" };
+                }
+
+                const matches = allSups.filter(
+                    (s) => s.split(" ")[0].toLowerCase() === first,
+                );
+
+                if (matches.length === 0) {
+                    console.log("[MeetOPS] No supervisor match for first name:", first);
+                    return { name: null, status: "no_match" };
+                }
+                if (matches.length > 1) {
+                    console.warn("[MeetOPS] Ambiguous supervisor match:", matches);
+                    return { name: null, status: "ambiguous", candidates: matches };
+                }
+
+                console.log("[MeetOPS] Matched supervisor:", matches[0]);
+                return { name: matches[0], status: "ok" };
+            }
+
+            // Show a persistent warning banner at the top of the content area
+            // for managers whose account cannot be auto-matched to a supervisor.
+            function showManagerMatchWarning(message) {
+                let banner = document.getElementById("supervisor-match-warning");
+                if (!banner) {
+                    banner = document.createElement("div");
+                    banner.id = "supervisor-match-warning";
+                    banner.style.cssText = [
+                        "background: var(--accent-orange-dim, rgba(251,146,60,0.12))",
+                        "border: 1px solid var(--accent-orange, #fb923c)",
+                        "border-radius: var(--radius-lg, 10px)",
+                        "color: var(--text-primary)",
+                        "font-size: 13px",
+                        "line-height: 1.6",
+                        "margin: 0 0 16px 0",
+                        "padding: 12px 16px",
+                        "display: flex",
+                        "align-items: flex-start",
+                        "gap: 10px",
+                    ].join(";");
+                    const content = document.getElementById("content");
+                    if (content) content.prepend(banner);
+                }
+                banner.innerHTML = `
+                    <svg style="flex-shrink:0;margin-top:2px" width="16" height="16" viewBox="0 0 24 24"
+                         fill="none" stroke="var(--accent-orange,#fb923c)" stroke-width="2">
+                        <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                        <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                    </svg>
+                    <span>${message}</span>`;
+                banner.style.display = "flex";
+            }
+
+            // Clear the supervisor match warning banner (e.g. after successful re-match).
+            function clearManagerMatchWarning() {
+                const banner = document.getElementById("supervisor-match-warning");
+                if (banner) banner.style.display = "none";
             }
 
             // Check if user is admin (UID exists in Firestore admins collection)
@@ -3258,11 +3316,32 @@
                 if (isAdmin) {
                     currentUserRole = "admin";
                     currentUserSupervisor = null;
+                    clearManagerMatchWarning();
                 } else {
                     currentUserRole = "manager";
-                    currentUserSupervisor = matchSupervisorFromEmail(
-                        currentUser.email,
-                    );
+                    const result = matchSupervisorFromEmail(currentUser.email);
+                    currentUserSupervisor = result.name;
+
+                    // Surface a visible warning for states that would silently
+                    // produce an empty manager dashboard.
+                    if (result.status === "ok") {
+                        clearManagerMatchWarning();
+                    } else if (result.status === "no_data") {
+                        // Data hasn't loaded yet — don't warn; will re-resolve after load.
+                        clearManagerMatchWarning();
+                    } else if (result.status === "no_match") {
+                        showManagerMatchWarning(
+                            `Your account (<strong>${currentUser.email}</strong>) could not be matched to a supervisor in the loaded data. ` +
+                            `Make sure your email first name matches the SUPERVISOR field in the CSV, ` +
+                            `or ask an admin to verify the data.`,
+                        );
+                    } else if (result.status === "ambiguous") {
+                        showManagerMatchWarning(
+                            `Your account (<strong>${currentUser.email}</strong>) matched multiple supervisors: ` +
+                            `<strong>${result.candidates.join(", ")}</strong>. ` +
+                            `Contact an admin to resolve the duplicate first names in the data.`,
+                        );
+                    }
                 }
 
                 // Update user badge
@@ -3733,9 +3812,20 @@
                 if (currentUserRole === "manager") {
                     // Re-attempt match if data loaded after initial resolve
                     if (!currentUserSupervisor && currentUser) {
-                        currentUserSupervisor = matchSupervisorFromEmail(
-                            currentUser.email,
-                        );
+                        const result = matchSupervisorFromEmail(currentUser.email);
+                        currentUserSupervisor = result.name;
+                        // Propagate any warning surfaced during the re-match
+                        if (result.status === "no_match") {
+                            showManagerMatchWarning(
+                                `Your account (<strong>${currentUser.email}</strong>) could not be matched to a supervisor in the loaded data.`,
+                            );
+                        } else if (result.status === "ambiguous") {
+                            showManagerMatchWarning(
+                                `Your account matched multiple supervisors: <strong>${result.candidates.join(", ")}</strong>. Contact an admin.`,
+                            );
+                        } else if (result.status === "ok") {
+                            clearManagerMatchWarning();
+                        }
                     }
                     if (currentUserSupervisor) {
                         rows = rows.filter(
@@ -5402,9 +5492,20 @@
                 if (currentUserRole === "manager") {
                     // Try re-matching in case data loaded after initial resolve
                     if (!currentUserSupervisor && currentUser) {
-                        currentUserSupervisor = matchSupervisorFromEmail(
-                            currentUser.email,
-                        );
+                        const result = matchSupervisorFromEmail(currentUser.email);
+                        currentUserSupervisor = result.name;
+                        // Propagate warning for problematic match states
+                        if (result.status === "no_match") {
+                            showManagerMatchWarning(
+                                `Your account (<strong>${currentUser.email}</strong>) could not be matched to a supervisor in the loaded data.`,
+                            );
+                        } else if (result.status === "ambiguous") {
+                            showManagerMatchWarning(
+                                `Your account matched multiple supervisors: <strong>${result.candidates.join(", ")}</strong>. Contact an admin.`,
+                            );
+                        } else if (result.status === "ok") {
+                            clearManagerMatchWarning();
+                        }
                     }
                     if (currentUserSupervisor) {
                         activeMgrDetail = currentUserSupervisor;
@@ -5416,14 +5517,18 @@
                         renderManagerDetail(currentUserSupervisor);
                         return;
                     } else {
-                        // No match found — show a helpful message
+                        // No match found — show a contextual message in the managers page
+                        const matchResult = matchSupervisorFromEmail(currentUser?.email || "");
+                        const isAmbiguous = matchResult.status === "ambiguous";
+                        const detailMsg = isAmbiguous
+                            ? `Multiple supervisors share your first name: <strong>${matchResult.candidates.join(", ")}</strong>.<br><br>Contact an admin to resolve the duplicate names in the CSV data.`
+                            : `Make sure your first name matches exactly as it appears in the SUPERVISOR column of the CSV, or ask an admin to check the uploaded data.`;
                         document.getElementById("mgr-select-screen").innerHTML =
-                            `
-        <div style="max-width:440px;margin:60px auto;text-align:center">
-          <div style="font-size:22px;font-weight:700;color:var(--text-primary);margin-bottom:8px">No data found</div>
+                            `<div style="max-width:440px;margin:60px auto;text-align:center">
+          <div style="font-size:22px;font-weight:700;color:var(--text-primary);margin-bottom:8px">${isAmbiguous ? "Ambiguous account" : "No data found"}</div>
           <div style="font-size:14px;color:var(--text-muted);line-height:1.6">
-            Your account (<strong>${currentUser?.email}</strong>) could not be matched to a supervisor in the uploaded data.<br><br>
-            Make sure your first name matches exactly as it appears in the CSV, or ask an admin to check the data.
+            Your account (<strong>${currentUser?.email}</strong>) could not be automatically matched to a single supervisor.<br><br>
+            ${detailMsg}
           </div>
         </div>`;
                         document.getElementById(
