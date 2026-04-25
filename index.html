@@ -6528,6 +6528,10 @@
                 pendingRevokeCTId = null;
                 pendingRevokeCTName = null;
                 document.getElementById("revoke-ct-overlay").style.display = "none";
+                // Always reset confirm button so back-to-back deletions work without a page refresh
+                const btn = document.getElementById("revoke-ct-confirm-btn");
+                btn.disabled = false;
+                btn.textContent = "Delete";
             }
 
             async function confirmRevokeCT() {
