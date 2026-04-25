@@ -3401,13 +3401,13 @@
         </div>
 
         <!-- REVOKE CT MODAL — manager confirms CT access revocation -->
-        <div id="revoke-ct-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:200; align-items:center; justify-content:center;">
+        <div id="revoke-ct-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:200; align-items:center; justify-content:center; flex-direction:column;">
             <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:1.5rem; width:100%; max-width:400px; margin:1rem;">
-                <div style="font-weight:600; color:var(--text-primary); margin-bottom:0.75rem;">Revoke CT Access</div>
+                <div style="font-weight:600; color:var(--text-primary); margin-bottom:0.75rem;">Delete Certified Trainer</div>
                 <div id="revoke-ct-message" style="font-size:0.875rem; color:var(--text-muted); margin-bottom:1.25rem;"></div>
                 <div style="display:flex; gap:8px; justify-content:flex-end;">
                     <button onclick="closeRevokeCTModal()" style="padding:0.5rem 1rem; background:var(--bg-base); border:1px solid var(--border); border-radius:6px; color:var(--text-muted); cursor:pointer;">Cancel</button>
-                    <button id="revoke-ct-confirm-btn" onclick="confirmRevokeCT()" style="padding:0.5rem 1rem; background:var(--accent-red); color:#fff; border:none; border-radius:6px; font-weight:600; cursor:pointer;">Revoke Access</button>
+                    <button id="revoke-ct-confirm-btn" onclick="confirmRevokeCT()" style="padding:0.5rem 1rem; background:var(--accent-red); color:#fff; border:none; border-radius:6px; font-weight:600; cursor:pointer;">Delete</button>
                 </div>
             </div>
         </div>
@@ -3487,6 +3487,7 @@
             let managerCoachingListener = null;  // onSnapshot unsubscribe fn for manager's coachings
             let managerCoachingDocs = {};         // coachingId → coaching data, kept in sync by listener
             let availableCTs = [];               // [{uid, name, email}] from certifiedTrainers collection
+            const ctDropdownOpen = new Set();    // UIDs of CTs with expanded assignment dropdown
 
             // Extract first name from email: "cameron.hodges@co.com" → "cameron"
             function firstNameFromEmail(email) {
@@ -6299,8 +6300,21 @@
                 const ct = availableCTs.find(c => c.uid === ctUid);
                 if (!ct) return;
 
+                // Enforce 5-employee cap: count total active (non-locked) coachings for this CT
+                try {
+                    const capSnap = await db.collection("coachings")
+                        .where("ctId", "==", ctUid)
+                        .get();
+                    const activeCount = capSnap.docs.filter(d => d.data().status !== "locked").length;
+                    if (activeCount >= 5) {
+                        alert(`${ct.name} already has 5 active coaching assignments. Complete or lock existing coachings before adding more.`);
+                        return;
+                    }
+                } catch (e) {
+                    console.error("assignCT cap check error:", e);
+                }
+
                 const managerName = currentUserSupervisor || currentUser.email.split("@")[0];
-                // Check if a coaching doc already exists for this employee + manager
                 const existing = Object.values(managerCoachingDocs).find(c => c.employeeName === employeeName);
 
                 try {
@@ -6358,38 +6372,67 @@
             }
 
             // Render the "Certified Trainers" section below the coaching panel.
-            // Lists unique CTs assigned to this manager with an active coaching count and revoke button.
+            // Shows ALL CTs from certifiedTrainers collection persistently.
+            // Each CT has a dropdown listing their assigned employees + status.
             function renderManageCTsSection() {
                 const container = document.getElementById("manage-cts-container");
                 if (!container) return;
 
-                // Collect unique CTs from this manager's coaching docs
-                const ctMap = {};
-                for (const c of Object.values(managerCoachingDocs)) {
-                    if (c.ctId) {
-                        if (!ctMap[c.ctId]) ctMap[c.ctId] = { id: c.ctId, name: c.ctName, count: 0 };
-                        if (c.status !== "locked") ctMap[c.ctId].count++;
-                    }
-                }
-
-                const cts = Object.values(ctMap);
-                if (!cts.length) {
-                    container.innerHTML = '<div style="color:var(--text-muted); font-size:0.85rem;">No certified trainers assigned yet.</div>';
+                if (!availableCTs.length) {
+                    container.innerHTML = '<div style="color:var(--text-muted); font-size:0.85rem; padding:0.5rem 0;">No certified trainers yet. Use "Invite CT" to add one.</div>';
                     return;
                 }
 
-                container.innerHTML = cts.map(ct => `
-                    <div style="display:flex; align-items:center; justify-content:space-between; padding:0.75rem; background:var(--bg-base); border:1px solid var(--border); border-radius:8px; margin-bottom:0.5rem;">
-                        <div>
-                            <div style="font-weight:600; font-size:0.9rem; color:var(--text-primary);">${ct.name}</div>
-                            <div style="font-size:0.75rem; color:var(--text-muted);">${ct.count} active coaching${ct.count !== 1 ? "s" : ""}</div>
-                        </div>
-                        <button onclick="openRevokeCTModal('${ct.id}', '${ct.name.replace(/'/g, "\\'")}')"
-                            style="padding:0.35rem 0.75rem; background:var(--accent-red-dim); color:var(--accent-red); border:1px solid var(--accent-red); border-radius:5px; font-size:0.8rem; cursor:pointer;">
-                            Revoke
-                        </button>
-                    </div>
-                `).join("");
+                const statusLabel = s => ({
+                    assigned:   { text: "Coaching",  color: "var(--accent-amber)" },
+                    submitted:  { text: "Submitted",  color: "var(--accent-green)" },
+                    locked:     { text: "Locked",     color: "var(--text-muted)"   },
+                    unassigned: { text: "Unassigned", color: "var(--text-muted)"   }
+                }[s] || { text: s, color: "var(--text-muted)" });
+
+                container.innerHTML = availableCTs.map(ct => {
+                    // Find all coachings assigned to this CT by this manager
+                    const assigned = Object.values(managerCoachingDocs)
+                        .filter(c => c.ctId === ct.uid);
+                    const activeCount = assigned.filter(c => c.status !== "locked").length;
+                    const isOpen = ctDropdownOpen.has(ct.uid);
+                    const safeName = ct.name.replace(/'/g, "\\'");
+                    const safeId   = ct.uid;
+
+                    const employeeRows = assigned.length
+                        ? assigned.map(c => {
+                            const sl = statusLabel(c.status);
+                            return `<div style="display:flex;align-items:center;justify-content:space-between;padding:0.4rem 0.75rem;border-top:1px solid var(--border);">
+                                <span style="font-size:0.82rem;color:var(--text-primary);">${c.employeeName}</span>
+                                <span style="font-size:0.75rem;font-weight:600;color:${sl.color};">${sl.text}</span>
+                            </div>`;
+                          }).join("")
+                        : `<div style="padding:0.4rem 0.75rem;border-top:1px solid var(--border);font-size:0.82rem;color:var(--text-muted);">No assignments</div>`;
+
+                    return `
+                        <div style="background:var(--bg-base);border:1px solid var(--border);border-radius:8px;margin-bottom:0.5rem;overflow:hidden;">
+                            <div style="display:flex;align-items:center;justify-content:space-between;padding:0.65rem 0.75rem;cursor:pointer;" onclick="toggleCTDropdown('${safeId}')">
+                                <div style="display:flex;align-items:center;gap:0.6rem;">
+                                    <span style="font-size:0.75rem;color:var(--text-muted);transition:transform 0.15s;display:inline-block;transform:rotate(${isOpen ? "90" : "0"}deg);">▶</span>
+                                    <div>
+                                        <div style="font-weight:600;font-size:0.88rem;color:var(--text-primary);">${ct.name}</div>
+                                        <div style="font-size:0.72rem;color:var(--text-muted);">${activeCount} active / 5 max</div>
+                                    </div>
+                                </div>
+                                <button onclick="event.stopPropagation();openRevokeCTModal('${safeId}','${safeName}')"
+                                    style="padding:0.3rem 0.65rem;background:var(--accent-red-dim);color:var(--accent-red);border:1px solid var(--accent-red);border-radius:5px;font-size:0.75rem;cursor:pointer;">
+                                    Delete
+                                </button>
+                            </div>
+                            ${isOpen ? `<div>${employeeRows}</div>` : ""}
+                        </div>`;
+                }).join("");
+            }
+
+            function toggleCTDropdown(ctId) {
+                if (ctDropdownOpen.has(ctId)) ctDropdownOpen.delete(ctId);
+                else ctDropdownOpen.add(ctId);
+                renderManageCTsSection();
             }
 
             // ══════════════════════════════════════════
@@ -6450,7 +6493,7 @@
                 pendingRevokeCTId = ctId;
                 pendingRevokeCTName = ctName;
                 document.getElementById("revoke-ct-message").textContent =
-                    `Revoking ${ctName} will permanently remove their CT access. Any coachings assigned to them will be unassigned and need to be reassigned.`;
+                    `Deleting ${ctName} will permanently remove their CT account and access. Any coachings assigned to them will be unassigned and will need to be reassigned.`;
                 document.getElementById("revoke-ct-overlay").style.display = "flex";
             }
 
@@ -6464,7 +6507,7 @@
                 if (!pendingRevokeCTId) return;
                 const btn = document.getElementById("revoke-ct-confirm-btn");
                 btn.disabled = true;
-                btn.textContent = "Revoking…";
+                btn.textContent = "Deleting…";
 
                 try {
                     const ctId = pendingRevokeCTId;
@@ -6494,10 +6537,13 @@
                     }
 
                     closeRevokeCTModal();
+                    // Refresh CT list so the deleted CT disappears immediately
+                    await loadAvailableCTs();
+                    renderManageCTsSection();
                 } catch (e) {
-                    console.error("Revoke CT error:", e);
+                    console.error("Delete CT error:", e);
                     btn.disabled = false;
-                    btn.textContent = "Revoke Access";
+                    btn.textContent = "Delete";
                 }
             }
 
