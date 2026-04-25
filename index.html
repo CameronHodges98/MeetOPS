@@ -3501,40 +3501,6 @@
             }
 
             // ══════════════════════════════════════════
-            // FIRESTORE — CYCLE TIME SAVE
-            // ══════════════════════════════════════════
-            async function saveCTData() {
-                if (!currentUser || !ctDays.length) return;
-                try {
-                    const batch = db.batch();
-                    for (const day of ctDays) {
-                        const byEmp = {};
-                        for (const r of day.records) {
-                            if (!byEmp[r.employee]) byEmp[r.employee] = [];
-                            byEmp[r.employee].push({
-                                a: r.action,
-                                s: r.supervisor,
-                                j: r.job_title,
-                                t: r.timestamp,
-                            });
-                        }
-                        for (const [emp, recs] of Object.entries(byEmp)) {
-                            const safeEmp = emp.replace(/[^a-zA-Z0-9_-]/g, "_");
-                            const ref = db
-                                .collection("ctDays")
-                                .doc(day.date)
-                                .collection("employees")
-                                .doc(safeEmp);
-                            batch.set(ref, { employee: emp, records: recs });
-                        }
-                    }
-                    await batch.commit();
-                } catch (e) {
-                    console.error("saveCTData error:", e);
-                }
-            }
-
-            // ══════════════════════════════════════════
             // THEME
             // ══════════════════════════════════════════
             function toggleTheme() {
