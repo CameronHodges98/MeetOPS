@@ -1772,9 +1772,18 @@
             .coaching-emp-card.status-assigned .coaching-emp-status { color: var(--accent-red); }
             .coaching-emp-card.status-submitted .coaching-emp-status,
             .coaching-emp-card.status-locked .coaching-emp-status { color: var(--accent-green); }
+            @keyframes spin { to { transform: rotate(360deg); } }
+            #auth-gate { position:fixed; inset:0; z-index:3000; background:var(--bg-base); display:flex; align-items:center; justify-content:center; flex-direction:column; gap:0.75rem; transition:opacity 0.2s; }
+            #auth-gate-spinner { width:32px; height:32px; border:3px solid var(--border); border-top-color:var(--accent-cyan); border-radius:50%; animation:spin 0.7s linear infinite; }
         </style>
     </head>
     <body>
+        <!-- AUTH GATE — visible on every page load; hidden after role resolution in initApp() -->
+        <div id="auth-gate">
+            <div id="auth-gate-spinner"></div>
+            <div style="font-size:0.8rem; color:var(--text-muted);">Loading…</div>
+        </div>
+
         <!-- LOGIN SCREEN -->
         <div
             id="login-screen"
@@ -3832,15 +3841,19 @@
                             try {
                                 const inviteDoc = await db.collection("invites").doc(inviteToken).get();
                                 if (inviteDoc.exists && !inviteDoc.data().used) {
+                                    document.getElementById("auth-gate").style.display = "none";
                                     showCTSignupScreen(inviteDoc.data(), inviteToken);
                                 } else {
+                                    document.getElementById("auth-gate").style.display = "none";
                                     document.getElementById("ct-invalid-invite-screen").style.display = "flex";
                                 }
                             } catch (e) {
                                 // Firestore error — fall back to normal login
+                                document.getElementById("auth-gate").style.display = "none";
                                 document.getElementById("login-screen").style.display = "flex";
                             }
                         } else {
+                            document.getElementById("auth-gate").style.display = "none";
                             document.getElementById("login-screen").style.display = "flex";
                         }
                     }
@@ -8582,6 +8595,7 @@
                     if (coachingPage) coachingPage.classList.add("active");
                     document.getElementById("page-title").textContent = "Coaching";
                     renderCTCoachingPage();
+                    document.getElementById("auth-gate").style.display = "none";
                     return; // skip all data loading — CTs don't need performance data
                 }
 
@@ -8643,6 +8657,9 @@
                     await loadCTData(from, to);
                     renderCycleTime();
                 }
+
+                // Auth gate: role resolved, data loaded, UI ready — reveal the app
+                document.getElementById("auth-gate").style.display = "none";
             }
 
             // Called when user changes date range — fetch current and prior-week data
