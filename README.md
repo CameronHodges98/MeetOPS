@@ -109,7 +109,15 @@ Any time you need to add a new manager:
 
 1. Go to Firebase console → Authentication → Users → Add user
 2. Give them their email + password
-3. They log in at your app URL
+3. They log in at your app URL — the app matches their email first name to
+   the SUPERVISOR field in the CSV to filter their view automatically
+
+To grant **admin** access (full data view + upload/delete):
+
+1. Go to Firebase console → Firestore Database
+2. Create a document at `admins/{uid}` — the document can be empty; its
+   existence is what grants admin rights
+3. The UID is shown in Authentication → Users next to the user's email
 
 ---
 
@@ -125,20 +133,31 @@ firebase deploy --only hosting
 
 ## Data Structure in Firestore
 
+All data is shared across all authenticated users. Role-based filtering
+(managers see only their own team) happens in the browser.
+
 ```
-users/
-  {uid}/
-    performanceDays/
-      2026-01-15  →  { date, filename, rows: [...] }
-      2026-01-16  →  { date, filename, rows: [...] }
-    ctDays/
-      2026-04-09  →  { date, filename }
-        employees/
-          John_Smith   →  { employee, records: [...] }
-          Jane_Doe     →  { employee, records: [...] }
+performanceDays/
+  2026-01-15  →  { date, filename, rows: [...] }
+  2026-01-16  →  { date, filename, rows: [...] }
+
+ctDays/
+  2026-04-09  →  { date, filename }
+    employees/
+      John_Smith   →  { employee, records: [...] }
+      Jane_Doe     →  { employee, records: [...] }
+
+admins/
+  {uid}  →  (document existence = admin role; content irrelevant)
 ```
 
-Each user's data is completely isolated — managers can only see their own uploads.
+Performance `rows` entries contain: `LOCATION`, `EMPLOYEE`, `SUPERVISOR`,
+`JOB TITLE`, `PPH`, `GAP %`, `POINTS`, `TOTAL HOURS`, `DIRECT HOURS`,
+`INDIRECT HOURS`, `ADMIN HOURS`, `GAP HOURS`, `PUNCH HOURS`, `DIRECT %`,
+`INDIRECT %`, `ADMIN %`.
+
+Cycle time `records` entries are stored compressed — keys `a` (action),
+`s` (supervisor), `j` (job title), `t` (ISO timestamp).
 
 ---
 
