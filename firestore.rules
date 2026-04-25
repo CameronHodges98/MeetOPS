@@ -2,23 +2,34 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Global performance data — all authenticated users can read and write
-    match /performanceDays/{date} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
+    // Helper: true if the requesting user has a document in the admins collection.
+    // Document existence (not content) determines admin status — same check used
+    // by checkAdminRole() on the client side.
+    function isAdmin() {
+      return request.auth != null &&
+             exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
 
-    // Global cycle time data — same rules, with nested subcollection
+    // Global performance data — all authenticated users can read;
+    // only admins may write (create / update / delete).
+    match /performanceDays/{date} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
+    }
+
+    // Global cycle time data — same read/write split as performanceDays.
+    // The employees subcollection inherits the same restriction.
     match /ctDays/{date} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      allow write: if isAdmin();
       match /employees/{emp} {
         allow read: if request.auth != null;
-        allow write: if request.auth != null;
+        allow write: if isAdmin();
       }
     }
 
-    // Admins collection — readable by all auth users, writable only via Firebase console
+    // Admins collection — readable by all auth users so the client can perform
+    // the role check; writable only via Firebase console (never from the app).
     match /admins/{uid} {
       allow read: if request.auth != null;
       allow write: if false;
