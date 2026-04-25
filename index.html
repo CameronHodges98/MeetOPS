@@ -1895,6 +1895,37 @@
             </div>
         </div>
 
+        <!-- CT SIGNUP SCREEN — shown when a valid ?invite=<token> URL param is present -->
+        <div id="ct-signup-screen" style="display:none; position:fixed; inset:0; z-index:1000; background:var(--bg-base); align-items:center; justify-content:center;">
+          <div style="width:100%; max-width:380px; padding:2rem;">
+            <div style="text-align:center; margin-bottom:2rem;">
+              <div style="font-size:1.5rem; font-weight:700; color:var(--text-primary);">Create CT Account</div>
+              <div id="ct-signup-manager-label" style="font-size:0.85rem; color:var(--text-muted); margin-top:0.5rem;"></div>
+            </div>
+            <div id="ct-signup-error" style="display:none; background:var(--accent-red-dim); color:var(--accent-red); border:1px solid var(--accent-red); border-radius:6px; padding:0.75rem; margin-bottom:1rem; font-size:0.875rem;"></div>
+            <input id="ct-signup-name" type="text" placeholder="Full Name" autocomplete="name"
+              style="width:100%; padding:0.75rem; margin-bottom:0.75rem; background:var(--bg-card); border:1px solid var(--border); border-radius:6px; color:var(--text-primary); font-size:0.95rem; box-sizing:border-box;" />
+            <input id="ct-signup-email" type="email" placeholder="Email" autocomplete="email"
+              style="width:100%; padding:0.75rem; margin-bottom:0.75rem; background:var(--bg-card); border:1px solid var(--border); border-radius:6px; color:var(--text-primary); font-size:0.95rem; box-sizing:border-box;" />
+            <input id="ct-signup-password" type="password" placeholder="Password (min 6 characters)" autocomplete="new-password"
+              style="width:100%; padding:0.75rem; margin-bottom:1.25rem; background:var(--bg-card); border:1px solid var(--border); border-radius:6px; color:var(--text-primary); font-size:0.95rem; box-sizing:border-box;" />
+            <button id="ct-signup-btn" onclick="handleCTSignup()"
+              style="width:100%; padding:0.75rem; background:var(--accent-cyan); color:#0d1117; border:none; border-radius:6px; font-weight:600; font-size:0.95rem; cursor:pointer;">
+              Create Account
+            </button>
+            <div id="ct-signup-loading" style="display:none; text-align:center; color:var(--text-muted); margin-top:1rem; font-size:0.875rem;">Creating account…</div>
+          </div>
+        </div>
+
+        <!-- CT INVALID INVITE SCREEN — shown when invite token is missing or already used -->
+        <div id="ct-invalid-invite-screen" style="display:none; position:fixed; inset:0; z-index:1000; background:var(--bg-base); align-items:center; justify-content:center;">
+          <div style="text-align:center; padding:2rem;">
+            <div style="font-size:1.25rem; font-weight:600; color:var(--text-primary); margin-bottom:0.5rem;">Invalid Invite Link</div>
+            <div style="color:var(--text-muted); font-size:0.9rem;">This invite link has already been used or is no longer valid.</div>
+            <button onclick="window.location.href=window.location.pathname" style="margin-top:1.5rem; padding:0.6rem 1.5rem; background:var(--bg-card); border:1px solid var(--border); border-radius:6px; color:var(--text-primary); cursor:pointer;">Go to Login</button>
+          </div>
+        </div>
+
         <!-- SIDEBAR -->
         <div id="sidebar" style="display: none">
             <div class="sidebar-logo">
@@ -3353,6 +3384,11 @@
             // (wasSignedIn false → just show the login screen normally).
             let wasSignedIn = false;
 
+            // ── CT Invite flow state ──
+            // Set when a valid invite token is found in the URL; consumed during handleCTSignup().
+            let pendingInviteToken = null;
+            let pendingInviteData = null;
+
             // Extract first name from email: "cameron.hodges@co.com" → "cameron"
             function firstNameFromEmail(email) {
                 // "jarod@nellisauction.com" → "jarod"
@@ -3588,6 +3624,61 @@
                 await auth.signOut();
             }
 
+            // ── CT signup: show the create-account form for an invited CT ──
+            function showCTSignupScreen(inviteData, token) {
+                pendingInviteToken = token;
+                pendingInviteData = inviteData;
+                const label = document.getElementById("ct-signup-manager-label");
+                if (label) label.textContent = `Invited by ${inviteData.managerName || "your manager"}`;
+                document.getElementById("ct-signup-screen").style.display = "flex";
+            }
+
+            // ── CT signup: handle form submit — creates Firebase auth + certifiedTrainers doc ──
+            async function handleCTSignup() {
+                const name = document.getElementById("ct-signup-name").value.trim();
+                const email = document.getElementById("ct-signup-email").value.trim();
+                const password = document.getElementById("ct-signup-password").value;
+                const errEl = document.getElementById("ct-signup-error");
+                const btnEl = document.getElementById("ct-signup-btn");
+                const loadEl = document.getElementById("ct-signup-loading");
+
+                errEl.style.display = "none";
+                if (!name || !email || !password) {
+                    errEl.textContent = "Please fill in all fields.";
+                    errEl.style.display = "block";
+                    return;
+                }
+                if (password.length < 6) {
+                    errEl.textContent = "Password must be at least 6 characters.";
+                    errEl.style.display = "block";
+                    return;
+                }
+
+                btnEl.style.display = "none";
+                loadEl.style.display = "block";
+
+                try {
+                    const cred = await auth.createUserWithEmailAndPassword(email, password);
+                    const uid = cred.user.uid;
+                    // Write CT doc — role will be detected by checkCTRole() on next initApp()
+                    await db.collection("certifiedTrainers").doc(uid).set({
+                        name,
+                        email,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    // Mark invite token as used so it cannot be reused
+                    if (pendingInviteToken) {
+                        await db.collection("invites").doc(pendingInviteToken).update({ used: true });
+                    }
+                    // auth.onAuthStateChanged fires automatically and calls initApp()
+                } catch (e) {
+                    btnEl.style.display = "block";
+                    loadEl.style.display = "none";
+                    errEl.textContent = e.message || "Failed to create account. Please try again.";
+                    errEl.style.display = "block";
+                }
+            }
+
             // ── Show/hide app vs login screen ──
             auth.onAuthStateChanged(async (user) => {
                 if (user) {
@@ -3615,11 +3706,26 @@
                         // login always starts from a blank slate regardless of who signs in.
                         window.location.reload();
                     } else {
-                        // Fresh page load with no active session — just reveal the
-                        // login screen. Reloading here would cause an infinite loop
-                        // because user === null fires immediately on every cold load.
-                        document.getElementById("login-screen").style.display =
-                            "flex";
+                        // Fresh page load with no active session.
+                        // Check for an invite token in the URL — if present, show the CT
+                        // signup screen instead of the regular login screen.
+                        const urlParams = new URLSearchParams(window.location.search);
+                        const inviteToken = urlParams.get("invite");
+                        if (inviteToken) {
+                            try {
+                                const inviteDoc = await db.collection("invites").doc(inviteToken).get();
+                                if (inviteDoc.exists && !inviteDoc.data().used) {
+                                    showCTSignupScreen(inviteDoc.data(), inviteToken);
+                                } else {
+                                    document.getElementById("ct-invalid-invite-screen").style.display = "flex";
+                                }
+                            } catch (e) {
+                                // Firestore error — fall back to normal login
+                                document.getElementById("login-screen").style.display = "flex";
+                            }
+                        } else {
+                            document.getElementById("login-screen").style.display = "flex";
+                        }
                     }
                 }
             });
