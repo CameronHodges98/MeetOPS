@@ -2149,6 +2149,7 @@
                     <span id="breadcrumb">/ overview</span>
                 </div>
                 <div class="topbar-right" id="topbar-right">
+                    <div id="topbar-filters" style="display:flex;align-items:center;gap:8px;">
                     <select
                         class="filter-select"
                         id="location-filter"
@@ -2191,6 +2192,7 @@
                         </button>
                     </div>
                     <span class="data-badge" id="record-count">0 records</span>
+                    </div>
                     <button
                         class="theme-toggle"
                         onclick="toggleTheme()"
@@ -3620,13 +3622,16 @@
                         const roleEl = document.getElementById("user-display-role");
                         if (nameEl) nameEl.textContent = currentCTName;
                         if (roleEl) roleEl.textContent = "certified trainer";
-                        // Hide all nav items except coaching (coaching nav added in commit 4)
+                        // Hide all nav items except coaching
                         document.querySelectorAll(".nav-item").forEach(n => {
                             n.style.display = n.dataset.page === "coaching" ? "" : "none";
                         });
-                        // Hide the topbar filter controls (date range + location)
-                        const filterGroup = document.getElementById("topbar-right");
-                        if (filterGroup) filterGroup.style.display = "none";
+                        // Hide filter controls (date range, location, record count) but keep theme + logout
+                        const topbarFilters = document.getElementById("topbar-filters");
+                        if (topbarFilters) topbarFilters.style.display = "none";
+                        // Hide upload buttons — CT users cannot upload data
+                        const uploadBtns = document.getElementById("sidebar-upload-btns");
+                        if (uploadBtns) uploadBtns.style.display = "none";
                         return;
                     }
                     currentUserRole = "manager";
@@ -4287,6 +4292,8 @@
             // NAV
             // ══════════════════════════════════════════
             function showPage(name, el) {
+                // CT users are hard-locked to the coaching page only
+                if (currentUserRole === "ct" && name !== "coaching") return;
                 const leavingCT =
                     getActivePage() === "cycletime" && name !== "cycletime";
                 document
