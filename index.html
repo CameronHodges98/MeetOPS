@@ -8,6 +8,8 @@
             href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
             rel="stylesheet"
         />
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" />
+        <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js"></script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-zoom/2.0.1/chartjs-plugin-zoom.min.js"></script>
@@ -1772,6 +1774,21 @@
             .coaching-emp-card.status-assigned .coaching-emp-status { color: var(--accent-red); }
             .coaching-emp-card.status-submitted .coaching-emp-status,
             .coaching-emp-card.status-locked .coaching-emp-status { color: var(--accent-green); }
+            /* ── Flatpickr calendar — MeetOPS theme overrides ── */
+            .flatpickr-calendar { background:var(--bg-card) !important; border:1px solid var(--border) !important; border-radius:10px !important; box-shadow:0 8px 32px rgba(0,0,0,0.4) !important; font-family:'Space Grotesk',sans-serif !important; }
+            .flatpickr-months .flatpickr-month, .flatpickr-weekdays { background:var(--bg-card) !important; }
+            .flatpickr-current-month span.cur-month, .flatpickr-current-month input.cur-year, .flatpickr-weekday { color:var(--text-primary) !important; fill:var(--text-primary) !important; }
+            .flatpickr-day { color:var(--text-primary) !important; border-radius:6px !important; }
+            .flatpickr-day:hover { background:var(--bg-card-hover) !important; }
+            .flatpickr-day.selected, .flatpickr-day.startRange, .flatpickr-day.endRange { background:var(--accent-cyan) !important; border-color:var(--accent-cyan) !important; color:#fff !important; }
+            .flatpickr-day.inRange { background:var(--accent-cyan-dim) !important; border-color:transparent !important; box-shadow:none !important; color:var(--text-primary) !important; }
+            .flatpickr-day.today:not(.selected) { border-color:var(--accent-cyan) !important; }
+            .flatpickr-day.disabled, .flatpickr-day.notAllowed { color:var(--text-muted) !important; opacity:0.4; }
+            .flatpickr-months .flatpickr-prev-month svg, .flatpickr-months .flatpickr-next-month svg { fill:var(--text-secondary) !important; }
+            .flatpickr-months .flatpickr-prev-month:hover svg, .flatpickr-months .flatpickr-next-month:hover svg { fill:var(--text-primary) !important; }
+            .flatpickr-calendar.arrowTop:before, .flatpickr-calendar.arrowTop:after { border-bottom-color:var(--border) !important; }
+            /* hide the original input flatpickr controls so only our styled altInput shows */
+            input.flatpickr-input[readonly]:not(.flatpickr-input.active) { display:none !important; }
             @keyframes spin { to { transform: rotate(360deg); } }
             #auth-gate { position:fixed; inset:0; z-index:3000; background:var(--bg-base); display:flex; align-items:center; justify-content:center; flex-direction:column; gap:0.75rem; transition:opacity 0.2s; }
             #auth-gate-spinner { width:32px; height:32px; border:3px solid var(--border); border-top-color:var(--accent-cyan); border-radius:50%; animation:spin 0.7s linear infinite; }
@@ -2167,38 +2184,20 @@
                         <option value="all">All Locations</option>
                     </select>
                     <div style="display: flex; align-items: center; gap: 6px">
-                        <input
-                            type="date"
-                            class="filter-select"
-                            id="date-from"
-                            onchange="applyFilters()"
-                            style="width: 136px; cursor: pointer"
-                            title="From date"
-                        />
-                        <span style="color: var(--text-muted); font-size: 12px"
-                            >→</span
-                        >
-                        <input
-                            type="date"
-                            class="filter-select"
-                            id="date-to"
-                            onchange="applyFilters()"
-                            style="width: 136px; cursor: pointer"
-                            title="To date"
-                        />
+                        <!-- Hidden value stores — all JS reads .value from these unchanged -->
+                        <input type="hidden" id="date-from" />
+                        <input type="hidden" id="date-to" />
+                        <!-- Flatpickr range picker — single calendar, apply on close -->
+                        <input type="text" id="date-range-input" class="filter-select"
+                               placeholder="Select date range…"
+                               style="width:200px; cursor:pointer;"
+                               readonly />
                         <button
                             class="filter-select"
                             onclick="resetDateRange()"
-                            title="Reset to full range"
-                            style="
-                                padding: 4px 8px;
-                                cursor: pointer;
-                                font-size: 11px;
-                                color: var(--text-muted);
-                            "
-                        >
-                            ✕
-                        </button>
+                            title="Reset to default range"
+                            style="padding: 4px 8px; cursor: pointer; font-size: 11px; color: var(--text-muted);"
+                        >✕</button>
                     </div>
                     <span class="data-badge" id="record-count">0 records</span>
                     </div>
@@ -4494,6 +4493,43 @@
                 return priorWeekRows;
             }
 
+            // Single source of truth for programmatic date range writes.
+            // Updates the hidden inputs (read by all existing code) and syncs the flatpickr display.
+            function setDateRange(from, to) {
+                document.getElementById("date-from").value = from;
+                document.getElementById("date-to").value = to;
+                if (window.dateRangePicker) {
+                    window.dateRangePicker.setDate([from, to], false);
+                }
+            }
+
+            // Initialize the flatpickr range calendar. Called once after DOM is ready.
+            function initDateRangePicker() {
+                window.dateRangePicker = flatpickr("#date-range-input", {
+                    mode: "range",
+                    dateFormat: "Y-m-d",
+                    altInput: true,
+                    altFormat: "M j",
+                    altInputClass: "filter-select",
+                    locale: { rangeSeparator: " – " },
+                    disableMobile: true,
+                    onClose: function(selectedDates) {
+                        if (selectedDates.length === 2) {
+                            const from = selectedDates[0].toLocaleDateString("sv");
+                            const to   = selectedDates[1].toLocaleDateString("sv");
+                            document.getElementById("date-from").value = from;
+                            document.getElementById("date-to").value = to;
+                            applyFilters();
+                        }
+                    }
+                });
+                // altInput inherits read-only; give it the right cursor and width
+                if (window.dateRangePicker.altInput) {
+                    window.dateRangePicker.altInput.style.width = "200px";
+                    window.dateRangePicker.altInput.style.cursor = "pointer";
+                }
+            }
+
             function updateDateRange() {
                 // Use the full metadata list for picker bounds — not just loaded data
                 const allDates = [
@@ -4506,22 +4542,23 @@
                 if (!fromEl.value && !toEl.value) {
                     if (currentUserRole === "manager") {
                         const { from, to } = getPriorWeekRange();
-                        fromEl.value = from;
-                        toEl.value = to;
+                        setDateRange(from, to);
                     } else {
                         const latest = availablePerfDates.length
                             ? availablePerfDates[availablePerfDates.length - 1]
                             : allDates[allDates.length - 1];
                         const { current } = getWeekBounds(latest);
-                        fromEl.value = current.from;
-                        toEl.value = latest;
+                        setDateRange(current.from, latest);
                     }
+                } else if (window.dateRangePicker) {
+                    // Picker already has a value — sync the display in case it was set before init
+                    window.dateRangePicker.setDate([fromEl.value, toEl.value], false);
                 }
                 // Bounds always reflect full available history
-                fromEl.min = allDates[0];
-                fromEl.max = allDates[allDates.length - 1];
-                toEl.min = allDates[0];
-                toEl.max = allDates[allDates.length - 1];
+                if (window.dateRangePicker) {
+                    window.dateRangePicker.set("minDate", allDates[0]);
+                    window.dateRangePicker.set("maxDate", allDates[allDates.length - 1]);
+                }
             }
 
             function resetDateRange() {
@@ -4532,15 +4569,13 @@
 
                 if (currentUserRole === "manager") {
                     const { from, to } = getPriorWeekRange();
-                    document.getElementById("date-from").value = from;
-                    document.getElementById("date-to").value = to;
+                    setDateRange(from, to);
                 } else {
                     const latest = availablePerfDates.length
                         ? availablePerfDates[availablePerfDates.length - 1]
                         : allDates[allDates.length - 1];
                     const { current } = getWeekBounds(latest);
-                    document.getElementById("date-from").value = current.from;
-                    document.getElementById("date-to").value = latest;
+                    setDateRange(current.from, latest);
                 }
                 applyFilters();
             }
@@ -4551,19 +4586,13 @@
                     ? availableCTDates
                     : ctDays.map((d) => d.date).sort();
                 if (!ctDates.length) return;
-                const fromEl = document.getElementById("date-from");
-                const toEl = document.getElementById("date-to");
                 const latest = ctDates[ctDates.length - 1];
-                const weekAgo =
-                    ctDates.length >= 7
-                        ? ctDates[ctDates.length - 7]
-                        : ctDates[0];
-                fromEl.value = weekAgo;
-                toEl.value = latest;
-                fromEl.min = ctDates[0];
-                fromEl.max = latest;
-                toEl.min = ctDates[0];
-                toEl.max = latest;
+                const weekAgo = ctDates.length >= 7 ? ctDates[ctDates.length - 7] : ctDates[0];
+                setDateRange(weekAgo, latest);
+                if (window.dateRangePicker) {
+                    window.dateRangePicker.set("minDate", ctDates[0]);
+                    window.dateRangePicker.set("maxDate", latest);
+                }
             }
 
             // Restore full combined date range when leaving Cycle Time tab
@@ -4572,26 +4601,21 @@
                     ...new Set([...availablePerfDates, ...availableCTDates]),
                 ].sort();
                 if (!allDates.length) return;
-                const fromEl = document.getElementById("date-from");
-                const toEl = document.getElementById("date-to");
 
                 if (currentUserRole === "manager") {
                     const { from, to } = getPriorWeekRange();
-                    fromEl.value = from;
-                    toEl.value = to;
+                    setDateRange(from, to);
                 } else {
-                    const latest = allDates[allDates.length - 1];
-                    const weekAgo =
-                        allDates.length >= 7
-                            ? allDates[allDates.length - 7]
-                            : allDates[0];
-                    fromEl.value = weekAgo;
-                    toEl.value = latest;
+                    const latest = availablePerfDates.length
+                        ? availablePerfDates[availablePerfDates.length - 1]
+                        : allDates[allDates.length - 1];
+                    const { current } = getWeekBounds(latest);
+                    setDateRange(current.from, latest);
                 }
-                fromEl.min = allDates[0];
-                fromEl.max = allDates[allDates.length - 1];
-                toEl.min = allDates[0];
-                toEl.max = allDates[allDates.length - 1];
+                if (window.dateRangePicker) {
+                    window.dateRangePicker.set("minDate", allDates[0]);
+                    window.dateRangePicker.set("maxDate", allDates[allDates.length - 1]);
+                }
                 applyFilters();
             }
 
@@ -8617,16 +8641,14 @@
                 // Step 2: Set default date values AND apply min/max bounds from full available history
                 if (currentUserRole === "manager") {
                     const { from, to } = getPriorWeekRange();
-                    document.getElementById("date-from").value = from;
-                    document.getElementById("date-to").value = to;
+                    setDateRange(from, to);
                 } else {
                     // Admin: default to Monday of the latest uploaded week through the latest date
                     const latest = availablePerfDates.length
                         ? availablePerfDates[availablePerfDates.length - 1]
                         : new Date().toLocaleDateString("sv");
                     const { current } = getWeekBounds(latest);
-                    document.getElementById("date-from").value = current.from;
-                    document.getElementById("date-to").value = latest;
+                    setDateRange(current.from, latest);
                 }
                 // Apply full-history bounds to pickers immediately
                 updateDateRange();
@@ -8677,6 +8699,10 @@
             }
 
             // Auth handles initApp via onAuthStateChanged — no direct call needed
+
+            // Initialize flatpickr range picker once DOM is ready (runs synchronously
+            // at script parse time since the script tag is at the end of the body).
+            initDateRangePicker();
         </script>
         <!-- MOBILE BOTTOM NAV -->
         <div id="mobile-nav" style="display: none">
