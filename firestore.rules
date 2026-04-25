@@ -34,5 +34,34 @@ service cloud.firestore {
       allow read: if request.auth != null;
       allow write: if false;
     }
+
+    // Invite tokens — any authenticated user can read/create/update (mark as used).
+    // Tokens are single-use; the app sets used:true after a CT account is created.
+    match /invites/{token} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null;
+    }
+
+    // Certified trainers — any auth user can read; CT can only create their own doc;
+    // any auth user can delete (manager revoke flow).
+    match /certifiedTrainers/{uid} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && request.auth.uid == uid;
+      allow delete: if request.auth != null;
+    }
+
+    // Coaching assignments — any authenticated user can read/write.
+    // Scoping is enforced client-side (managerId / ctId fields).
+    match /coachings/{id} {
+      allow read, write: if request.auth != null;
+    }
+
+    // Revoked users — any authenticated user can read/write.
+    // Written by manager during revoke; read by initApp() gate check.
+    match /revokedUsers/{uid} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
   }
 }
