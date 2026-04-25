@@ -3481,6 +3481,11 @@
             let ctCoachingListener = null;   // onSnapshot unsubscribe fn — cleaned up on page leave
             let currentCTCoachingId = null;  // ID of coaching doc currently being viewed
 
+            // ── Manager coaching section state ──
+            let managerCoachingListener = null;  // onSnapshot unsubscribe fn for manager's coachings
+            let managerCoachingDocs = {};         // coachingId → coaching data, kept in sync by listener
+            let availableCTs = [];               // [{uid, name, email}] from certifiedTrainers collection
+
             // Extract first name from email: "cameron.hodges@co.com" → "cameron"
             function firstNameFromEmail(email) {
                 // "jarod@nellisauction.com" → "jarod"
@@ -5681,11 +5686,22 @@
                 } else {
                     flagPanel.style.display = "block";
 
-                    // Build panel — coaching state lives in coachingComplete (Set of employee names)
+                    // Build panel — Firestore-backed coaching state; local coachingComplete for
+                    // backwards-compatible "mark coached" toggle (kept for sessions with no CTs)
                     const renderCoachingPanel = () => {
-                        const doneCount = flaggedEmps.filter((e) =>
-                            coachingComplete.has(e.name),
-                        ).length;
+                        // Count employees whose coaching doc is submitted or locked (Firestore) OR
+                        // locally marked coached (legacy coachingComplete toggle)
+                        const doneCount = flaggedEmps.filter((e) => {
+                            const doc = Object.values(managerCoachingDocs).find(c => c.employeeName === e.name);
+                            return (doc && (doc.status === "submitted" || doc.status === "locked")) || coachingComplete.has(e.name);
+                        }).length;
+
+                        // Build CT dropdown options — re-read availableCTs each render so newly
+                        // added CTs appear without requiring a page reload
+                        const ctOptions = availableCTs.length
+                            ? availableCTs.map(ct => `<option value="${ct.uid}">${ct.name}</option>`).join("")
+                            : '<option value="">No CTs available</option>';
+
                         flagPanel.innerHTML = `
         <div class="chart-card" style="border-color:rgba(248,81,73,0.25);border-left:3px solid ${doneCount === flaggedEmps.length ? "var(--accent-green)" : "var(--accent-red)"}">
           <div class="chart-card-header" style="margin-bottom:12px">
@@ -5693,9 +5709,9 @@
               <div class="chart-card-title" style="color:${doneCount === flaggedEmps.length ? "var(--accent-green)" : "var(--accent-red)"}">
                 ${doneCount === flaggedEmps.length ? "✓ Coaching Complete" : "Coaching Required"}
               </div>
-              <div class="chart-card-sub">${doneCount} of ${flaggedEmps.length} coached · click a tile to mark complete${deptIPFAvg !== null ? ` · 6-mo return avg: ${fmtSec(deptIPFAvg)}` : ""}</div>
+              <div class="chart-card-sub">${doneCount} of ${flaggedEmps.length} coached${deptIPFAvg !== null ? ` · 6-mo return avg: ${fmtSec(deptIPFAvg)}` : ""}</div>
             </div>
-            <button onclick="openInviteCTModal()" style="padding:0.4rem 0.9rem; background:var(--bg-surface); border:1px solid var(--border); border-radius:6px; color:var(--text-primary); font-size:0.8rem; cursor:pointer; white-space:nowrap;">+ Invite Certified Trainer</button>
+            <button onclick="openInviteCTModal()" style="padding:0.4rem 0.9rem; background:var(--bg-surface); border:1px solid var(--border); border-radius:6px; color:var(--text-primary); font-size:0.8rem; cursor:pointer; white-space:nowrap;">+ Invite CT</button>
           </div>
           <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px">
             ${flaggedEmps
@@ -5704,48 +5720,81 @@
                     const eGAP = avg(e.rows, "GAP %");
                     const lowPPH = ePPH < 100;
                     const highGAP = eGAP > 0.1;
-                    const coached = coachingComplete.has(e.name);
-                    const safeName = e.name
-                        .replace(/\\/g, "\\\\")
-                        .replace(/'/g, "\\'");
-                    const badges = coached
-                        ? `<span style="font-size:9px;font-weight:700;background:var(--accent-green-dim);color:var(--accent-green);padding:2px 5px;border-radius:3px;font-family:monospace">COACHED ✓</span>`
-                        : [
-                              lowPPH
-                                  ? `<span style="font-size:9px;font-weight:700;background:var(--accent-red-dim);color:var(--accent-red);padding:2px 5px;border-radius:3px;font-family:monospace">LOW PPH</span>`
-                                  : "",
-                              highGAP
-                                  ? `<span style="font-size:9px;font-weight:700;background:var(--accent-amber-dim);color:var(--accent-amber);padding:2px 5px;border-radius:3px;font-family:monospace">HIGH GAP</span>`
-                                  : "",
-                          ]
-                              .filter(Boolean)
-                              .join(" ");
+                    const safeName = e.name.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
 
-                    return `<div onclick="toggleCoaching('${safeName}')"
-                style="display:flex;align-items:center;gap:10px;padding:9px 12px;
-                       background:${coached ? "var(--accent-green-dim)" : "var(--bg-surface)"};
-                       border:1px solid ${coached ? "rgba(63,185,80,0.4)" : "var(--border)"};
-                       border-radius:var(--radius);cursor:pointer;transition:all 0.2s"
-                onmouseover="this.style.borderColor='${coached ? "var(--accent-green)" : "var(--accent-red)"}'"
-                onmouseout="this.style.borderColor='${coached ? "rgba(63,185,80,0.4)" : "var(--border)"}'">
-                <div style="flex:1;min-width:0">
-                  <div style="font-size:13px;font-weight:600;color:${coached ? "var(--accent-green)" : "var(--text-primary)"};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${e.name}</div>
-                  <div style="font-size:10px;color:var(--text-muted);margin-top:2px">${e.jobTitle}</div>
+                    // Look up Firestore coaching doc for this employee
+                    const coachingDoc = Object.values(managerCoachingDocs).find(c => c.employeeName === e.name);
+                    const status = coachingDoc ? coachingDoc.status : "unassigned";
+                    const assignedCT = coachingDoc ? coachingDoc.ctName : null;
+                    const coachingId = coachingDoc ? coachingDoc.id : null;
+
+                    // Determine visual state
+                    const isComplete = status === "submitted" || status === "locked" || coachingComplete.has(e.name);
+                    const isLocked = status === "locked";
+                    const isSubmitted = status === "submitted";
+
+                    // Status badge
+                    const statusBadge = isLocked
+                        ? `<span style="font-size:9px;font-weight:700;background:var(--accent-green-dim);color:var(--accent-green);padding:2px 5px;border-radius:3px;font-family:monospace">LOCKED</span>`
+                        : isSubmitted
+                        ? `<span style="font-size:9px;font-weight:700;background:var(--accent-green-dim);color:var(--accent-green);padding:2px 5px;border-radius:3px;font-family:monospace">SUBMITTED</span>`
+                        : assignedCT
+                        ? `<span style="font-size:9px;font-weight:700;background:var(--accent-cyan-dim);color:var(--accent-cyan);padding:2px 5px;border-radius:3px;font-family:monospace">ASSIGNED</span>`
+                        : [
+                              lowPPH ? `<span style="font-size:9px;font-weight:700;background:var(--accent-red-dim);color:var(--accent-red);padding:2px 5px;border-radius:3px;font-family:monospace">LOW PPH</span>` : "",
+                              highGAP ? `<span style="font-size:9px;font-weight:700;background:var(--accent-amber-dim);color:var(--accent-amber);padding:2px 5px;border-radius:3px;font-family:monospace">HIGH GAP</span>` : "",
+                          ].filter(Boolean).join(" ");
+
+                    // CT assignment controls — shown below employee name
+                    const ctControls = isLocked ? "" : isSubmitted
+                        ? `<div style="margin-top:6px">
+                             <button onclick="lockCoaching('${coachingId}')" style="padding:3px 8px;background:var(--accent-green-dim);color:var(--accent-green);border:1px solid var(--accent-green);border-radius:4px;font-size:10px;cursor:pointer;">Lock</button>
+                           </div>`
+                        : assignedCT
+                        ? `<div style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap;align-items:center;">
+                             <span style="font-size:10px;color:var(--text-muted);">CT: ${assignedCT}</span>
+                             <button onclick="unassignCT('${coachingId}')" style="padding:2px 6px;background:var(--bg-surface);border:1px solid var(--border);border-radius:4px;font-size:9px;cursor:pointer;color:var(--text-muted);">Unassign</button>
+                           </div>`
+                        : `<div style="margin-top:6px;display:flex;gap:4px;align-items:center;">
+                             <select id="ct-sel-${safeName}" style="font-size:10px;padding:2px 4px;background:var(--bg-card);border:1px solid var(--border);border-radius:4px;color:var(--text-primary);max-width:120px;">
+                               <option value="">Select CT…</option>
+                               ${ctOptions}
+                             </select>
+                             <button onclick="assignCT('${safeName}', document.getElementById('ct-sel-${safeName}').value)" style="padding:2px 6px;background:var(--accent-cyan-dim);color:var(--accent-cyan);border:1px solid var(--accent-cyan);border-radius:4px;font-size:9px;cursor:pointer;">Assign</button>
+                           </div>`;
+
+                    return `<div style="padding:9px 12px;
+                               background:${isComplete ? "var(--accent-green-dim)" : "var(--bg-surface)"};
+                               border:1px solid ${isComplete ? "rgba(63,185,80,0.4)" : "var(--border)"};
+                               border-radius:var(--radius);transition:all 0.2s">
+                <div style="display:flex;align-items:center;gap:10px">
+                  <div style="flex:1;min-width:0">
+                    <div style="font-size:13px;font-weight:600;color:${isComplete ? "var(--accent-green)" : "var(--text-primary)"};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${e.name}</div>
+                    <div style="font-size:10px;color:var(--text-muted);margin-top:2px">${e.jobTitle}</div>
+                  </div>
+                  <div style="text-align:right;flex-shrink:0">
+                    <div style="font-size:13px;font-weight:700;font-family:'JetBrains Mono',monospace;color:${lowPPH ? "var(--accent-red)" : "var(--accent-green)"}">${ePPH.toFixed(1)}</div>
+                    <div style="font-size:11px;color:${highGAP ? "var(--accent-red)" : "var(--accent-green)"};">${(eGAP * 100).toFixed(1)}% GAP</div>
+                  </div>
+                  <div style="display:flex;flex-direction:column;gap:3px;flex-shrink:0">${statusBadge}</div>
                 </div>
-                <div style="text-align:right;flex-shrink:0">
-                  <div style="font-size:13px;font-weight:700;font-family:'JetBrains Mono',monospace;color:${coached ? "var(--accent-green)" : lowPPH ? "var(--accent-red)" : "var(--accent-green)"}">${ePPH.toFixed(1)}</div>
-                  <div style="font-size:11px;color:${coached ? "var(--accent-green)" : highGAP ? "var(--accent-red)" : "var(--accent-green)"};">${(eGAP * 100).toFixed(1)}% GAP</div>
-                </div>
-                <div style="display:flex;flex-direction:column;gap:3px;flex-shrink:0">${badges}</div>
+                ${ctControls}
               </div>`;
                 })
                 .join("")}
           </div>
+          <!-- Certified Trainers management section -->
+          <div style="margin-top:1.5rem;padding-top:1rem;border-top:1px solid var(--border);">
+            <div style="font-size:0.75rem;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);margin-bottom:0.75rem;">Certified Trainers</div>
+            <div id="manage-cts-container"></div>
+          </div>
         </div>`;
+                        // After DOM is set, render the manage-CTs section
+                        renderManageCTsSection();
                     };
 
                     renderCoachingPanel();
-                    // Store renderer so toggleCoaching can call it
+                    // Store renderer so the Firestore listener can call it on data changes
                     window._renderCoachingPanel = renderCoachingPanel;
                 }
 
@@ -6205,6 +6254,138 @@
             // MANAGERS PAGE — SELECTION SCREEN
             // ══════════════════════════════════════════
             // ══════════════════════════════════════════
+            // MANAGER COACHING — Firestore-backed CT assignment
+            // ══════════════════════════════════════════
+
+            // Fetch the list of all certified trainers for the assignment dropdown.
+            async function loadAvailableCTs() {
+                try {
+                    const snap = await db.collection("certifiedTrainers").get();
+                    availableCTs = snap.docs.map(d => ({ uid: d.id, ...d.data() }));
+                } catch (e) {
+                    console.error("loadAvailableCTs error:", e);
+                    availableCTs = [];
+                }
+            }
+
+            // Start a real-time listener on this manager's coachings.
+            // Keeps managerCoachingDocs in sync and re-renders the coaching panel on each change.
+            // Guards against duplicate listeners — safe to call multiple times.
+            function startManagerCoachingListener() {
+                if (managerCoachingListener) return; // already running
+                managerCoachingListener = db.collection("coachings")
+                    .where("managerId", "==", currentUser.uid)
+                    .onSnapshot(snap => {
+                        managerCoachingDocs = {};
+                        for (const doc of snap.docs) {
+                            managerCoachingDocs[doc.id] = { id: doc.id, ...doc.data() };
+                        }
+                        // Re-render the coaching panel and manage-CTs section with fresh data
+                        if (window._renderCoachingPanel) window._renderCoachingPanel();
+                        renderManageCTsSection();
+                    }, err => console.error("Manager coaching listener error:", err));
+            }
+
+            // Assign a CT to an employee (create or update the coaching doc).
+            async function assignCT(employeeName, ctUid) {
+                if (!ctUid) return;
+                const ct = availableCTs.find(c => c.uid === ctUid);
+                if (!ct) return;
+
+                const managerName = currentUserSupervisor || currentUser.email.split("@")[0];
+                // Check if a coaching doc already exists for this employee + manager
+                const existing = Object.values(managerCoachingDocs).find(c => c.employeeName === employeeName);
+
+                try {
+                    if (existing) {
+                        await db.collection("coachings").doc(existing.id).update({
+                            ctId: ctUid,
+                            ctName: ct.name,
+                            status: "assigned",
+                            assignedAt: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                    } else {
+                        await db.collection("coachings").add({
+                            employeeName,
+                            managerId: currentUser.uid,
+                            managerName,
+                            ctId: ctUid,
+                            ctName: ct.name,
+                            status: "assigned",
+                            assignedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                            submittedAt: null,
+                            lockedAt: null,
+                            trainingPoints: [],
+                            managerComment: ""
+                        });
+                    }
+                } catch (e) {
+                    console.error("assignCT error:", e);
+                }
+            }
+
+            // Remove CT assignment from a coaching doc.
+            async function unassignCT(coachingId) {
+                try {
+                    await db.collection("coachings").doc(coachingId).update({
+                        ctId: null,
+                        ctName: null,
+                        status: "unassigned",
+                        assignedAt: null
+                    });
+                } catch (e) {
+                    console.error("unassignCT error:", e);
+                }
+            }
+
+            // Lock a submitted coaching — prevents further edits by the CT.
+            async function lockCoaching(coachingId) {
+                try {
+                    await db.collection("coachings").doc(coachingId).update({
+                        status: "locked",
+                        lockedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                } catch (e) {
+                    console.error("lockCoaching error:", e);
+                }
+            }
+
+            // Render the "Certified Trainers" section below the coaching panel.
+            // Lists unique CTs assigned to this manager with an active coaching count and revoke button.
+            function renderManageCTsSection() {
+                const container = document.getElementById("manage-cts-container");
+                if (!container) return;
+
+                // Collect unique CTs from this manager's coaching docs
+                const ctMap = {};
+                for (const c of Object.values(managerCoachingDocs)) {
+                    if (c.ctId) {
+                        if (!ctMap[c.ctId]) ctMap[c.ctId] = { id: c.ctId, name: c.ctName, count: 0 };
+                        if (c.status !== "locked") ctMap[c.ctId].count++;
+                    }
+                }
+
+                const cts = Object.values(ctMap);
+                if (!cts.length) {
+                    container.innerHTML = '<div style="color:var(--text-muted); font-size:0.85rem;">No certified trainers assigned yet.</div>';
+                    return;
+                }
+
+                container.innerHTML = cts.map(ct => `
+                    <div style="display:flex; align-items:center; justify-content:space-between; padding:0.75rem; background:var(--bg-base); border:1px solid var(--border); border-radius:8px; margin-bottom:0.5rem;">
+                        <div>
+                            <div style="font-weight:600; font-size:0.9rem; color:var(--text-primary);">${ct.name}</div>
+                            <div style="font-size:0.75rem; color:var(--text-muted);">${ct.count} active coaching${ct.count !== 1 ? "s" : ""}</div>
+                        </div>
+                        <button onclick="openRevokeCTModal('${ct.id}', '${ct.name.replace(/'/g, "\\'")}')"
+                            style="padding:0.35rem 0.75rem; background:var(--accent-red-dim); color:var(--accent-red); border:1px solid var(--accent-red); border-radius:5px; font-size:0.8rem; cursor:pointer;">
+                            Revoke
+                        </button>
+                    </div>
+                `).join("");
+            }
+
+            // ══════════════════════════════════════════
             // INVITE CT — manager generates a single-use invite link
             // ══════════════════════════════════════════
 
@@ -6320,6 +6501,12 @@
                 document.getElementById("managers-content").style.display =
                     hasData ? "block" : "none";
                 if (!hasData) return;
+
+                // Start Firestore listeners and load CT list for manager coaching features
+                if (currentUserRole === "manager" || currentUserRole === "admin") {
+                    startManagerCoachingListener();
+                    loadAvailableCTs();
+                }
 
                 // Manager role: skip selection screen, go straight to their own view
                 if (currentUserRole === "manager") {
