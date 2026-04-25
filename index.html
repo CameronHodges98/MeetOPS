@@ -1927,6 +1927,7 @@
                 <div
                     class="nav-item active"
                     data-label="Dashboard"
+                    data-page="dashboard"
                     onclick="showPage('dashboard', this)"
                 >
                     <svg
@@ -1945,6 +1946,7 @@
                 <div
                     class="nav-item"
                     data-label="Managers"
+                    data-page="managers"
                     onclick="showPage('managers', this)"
                 >
                     <svg
@@ -1963,6 +1965,7 @@
                 <div
                     class="nav-item"
                     data-label="Employees"
+                    data-page="employees"
                     onclick="showPage('employees', this)"
                 >
                     <svg
@@ -1980,6 +1983,7 @@
                 <div
                     class="nav-item"
                     data-label="Trends"
+                    data-page="trends"
                     onclick="showPage('trends', this)"
                 >
                     <svg
@@ -1995,6 +1999,7 @@
                 <div
                     class="nav-item"
                     data-label="Cycle Time"
+                    data-page="cycletime"
                     onclick="showPage('cycletime', this)"
                 >
                     <svg
@@ -2012,6 +2017,7 @@
                 <div
                     class="nav-item"
                     data-label="Data History"
+                    data-page="history"
                     onclick="showPage('history', this)"
                 >
                     <svg
@@ -2076,7 +2082,7 @@
                     <span id="page-title">Dashboard</span>
                     <span id="breadcrumb">/ overview</span>
                 </div>
-                <div class="topbar-right">
+                <div class="topbar-right" id="topbar-right">
                     <select
                         class="filter-select"
                         id="location-filter"
@@ -3338,8 +3344,9 @@
             const db = firebase.firestore();
 
             let currentUser = null;
-            let currentUserRole = "manager"; // 'admin' | 'manager'
+            let currentUserRole = "manager"; // 'admin' | 'manager' | 'ct'
             let currentUserSupervisor = null; // matched full supervisor name from data, null = admin
+            let currentCTName = ""; // full name of CT user from certifiedTrainers doc
             // Tracks whether the user was ever signed in during this session.
             // Used in onAuthStateChanged to distinguish a sign-out transition
             // (wasSignedIn true → reload to clear state) from a fresh page load
@@ -3450,6 +3457,17 @@
                 }
             }
 
+            // Check if user is a Certified Trainer (UID exists in certifiedTrainers collection)
+            // Returns the CT doc data object if found, null otherwise.
+            async function checkCTRole(uid) {
+                try {
+                    const doc = await db.collection("certifiedTrainers").doc(uid).get();
+                    return doc.exists ? doc.data() : null;
+                } catch (e) {
+                    return null;
+                }
+            }
+
             // Call after data loads to resolve the user's role
             async function resolveUserRole() {
                 if (!currentUser) return;
@@ -3459,6 +3477,25 @@
                     currentUserSupervisor = null;
                     clearManagerMatchWarning();
                 } else {
+                    // Check CT role before falling through to manager
+                    const ctData = await checkCTRole(currentUser.uid);
+                    if (ctData) {
+                        currentUserRole = "ct";
+                        currentCTName = ctData.name || currentUser.email;
+                        // Update header display
+                        const nameEl = document.getElementById("user-display-name");
+                        const roleEl = document.getElementById("user-display-role");
+                        if (nameEl) nameEl.textContent = currentCTName;
+                        if (roleEl) roleEl.textContent = "certified trainer";
+                        // Hide all nav items except coaching (coaching nav added in commit 4)
+                        document.querySelectorAll(".nav-item").forEach(n => {
+                            n.style.display = n.dataset.page === "coaching" ? "" : "none";
+                        });
+                        // Hide the topbar filter controls (date range + location)
+                        const filterGroup = document.getElementById("topbar-right");
+                        if (filterGroup) filterGroup.style.display = "none";
+                        return;
+                    }
                     currentUserRole = "manager";
                     const result = matchSupervisorFromEmail(currentUser.email);
                     currentUserSupervisor = result.name;
@@ -7834,6 +7871,16 @@
             // INIT
             // ══════════════════════════════════════════
             async function initApp() {
+                if (!currentUser) return;
+
+                // Revocation gate — if this user has been revoked, sign them out immediately.
+                // This fires before any role check so revoked CTs cannot access any data.
+                const revokedDoc = await db.collection("revokedUsers").doc(currentUser.uid).get();
+                if (revokedDoc.exists) {
+                    await auth.signOut();
+                    return;
+                }
+
                 // Step 1: Resolve role so we know if manager or admin (no data needed yet)
                 await resolveUserRole();
 
