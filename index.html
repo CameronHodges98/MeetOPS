@@ -3258,13 +3258,6 @@
                 if (historyNavItem)
                     historyNavItem.style.display =
                         currentUserRole === "admin" ? "" : "none";
-
-                // For managers: immediately apply prior week range
-                if (currentUserRole === "manager") {
-                    const { from, to } = getPriorWeekRange();
-                    document.getElementById("date-from").value = from;
-                    document.getElementById("date-to").value = to;
-                }
             }
 
             async function handleLogin() {
@@ -3354,17 +3347,149 @@
                 }
             }
 
+            // ── In-memory cache to avoid re-fetching already loaded dates ──
+            const perfCache = new Set(); // dates already loaded into allDays
+            const ctCache = new Set(); // dates already loaded into ctDays
+
+            // Lightweight metadata — just date strings, no row data
+            // Used to set date picker min/max without loading all data
+            let availablePerfDates = []; // all dates that exist in performanceDays collection
+            let availableCTDates = []; // all dates that exist in ctDays collection
+
             async function loadData() {
                 if (!currentUser) return;
+                // Only load the date range currently selected (or prior week on first load)
+                const from = document.getElementById("date-from").value;
+                const to = document.getElementById("date-to").value;
+                if (!from || !to) return;
+
                 try {
-                    // Data is stored globally — all users read from the same collection
                     const snap = await db
+                        .collection("performanceDays")
+                        .where("date", ">=", from)
+                        .where("date", "<=", to)
+                        .orderBy("date")
+                        .get();
+
+                    for (const doc of snap.docs) {
+                        const day = doc.data();
+                        if (!perfCache.has(day.date)) {
+                            const existing = allDays.findIndex(
+                                (d) => d.date === day.date,
+                            );
+                            if (existing >= 0) allDays[existing] = day;
+                            else allDays.push(day);
+                            perfCache.add(day.date);
+                        }
+                    }
+                    allDays.sort((a, b) => a.date.localeCompare(b.date));
+                } catch (e) {
+                    console.error("loadData error:", e);
+                }
+            }
+
+            // Load CT data on demand for a specific date range
+            async function loadCTData(fromDate, toDate) {
+                if (!currentUser) {
+                    ctDays = [];
+                    return;
+                }
+                try {
+                    // Only fetch dates not already cached
+                    const snap = await db
+                        .collection("ctDays")
+                        .where("date", ">=", fromDate)
+                        .where("date", "<=", toDate)
+                        .get();
+
+                    for (const dayDoc of snap.docs) {
+                        const date = dayDoc.id;
+                        if (ctCache.has(date)) continue; // already loaded
+
+                        const empSnap = await db
+                            .collection("ctDays")
+                            .doc(date)
+                            .collection("employees")
+                            .get();
+                        const records = [];
+                        for (const empDoc of empSnap.docs) {
+                            const d = empDoc.data();
+                            for (const r of d.records || []) {
+                                records.push({
+                                    action: r.a,
+                                    supervisor: r.s,
+                                    job_title: r.j,
+                                    employee: d.employee,
+                                    timestamp: r.t,
+                                });
+                            }
+                        }
+                        const existing = ctDays.findIndex(
+                            (d) => d.date === date,
+                        );
+                        if (existing >= 0)
+                            ctDays[existing] = {
+                                date,
+                                filename: dayDoc.data().filename || "",
+                                records,
+                            };
+                        else
+                            ctDays.push({
+                                date,
+                                filename: dayDoc.data().filename || "",
+                                records,
+                            });
+                        ctCache.add(date);
+                    }
+
+                    ctDays.sort((a, b) => a.date.localeCompare(b.date));
+                    const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+                    ctDays = ctDays.filter((d) => DATE_RE.test(d.date));
+                } catch (e) {
+                    console.error("loadCTData error:", e);
+                }
+            }
+
+            // Load the 6-month CT window for baseline avg (Returns Clerk rule)
+            // Only fetches dates not already in cache
+            async function load6MonthCTBaseline() {
+                const sixMonthsAgo = new Date();
+                sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+                const from = sixMonthsAgo.toISOString().split("T")[0];
+                const to = new Date().toISOString().split("T")[0];
+                await loadCTData(from, to);
+            }
+
+            // Fetch just the list of dates that exist — no row data, very fast
+            // Used to set date picker bounds without loading everything
+            async function fetchAvailableDates() {
+                if (!currentUser) return;
+                try {
+                    // Performance dates — use document IDs only (no field data needed)
+                    const perfSnap = await db
                         .collection("performanceDays")
                         .orderBy("date")
                         .get();
-                    allDays = snap.docs.map((d) => d.data());
+                    availablePerfDates = perfSnap.docs
+                        .map((d) => d.id)
+                        .filter((id) => /^\d{4}-\d{2}-\d{2}$/.test(id))
+                        .sort();
+
+                    // CT dates — document IDs are the dates
+                    const ctSnap = await db.collection("ctDays").get();
+                    availableCTDates = ctSnap.docs
+                        .map((d) => d.id)
+                        .filter((id) => /^\d{4}-\d{2}-\d{2}$/.test(id))
+                        .sort();
+
+                    console.log(
+                        "[MeetOPS] Available perf dates:",
+                        availablePerfDates.length,
+                        "| CT dates:",
+                        availableCTDates.length,
+                    );
                 } catch (e) {
-                    allDays = [];
+                    console.warn("[MeetOPS] fetchAvailableDates error:", e);
                 }
             }
 
@@ -3376,15 +3501,13 @@
             }
 
             // ══════════════════════════════════════════
-            // FIRESTORE — CYCLE TIME DATA
+            // FIRESTORE — CYCLE TIME SAVE
             // ══════════════════════════════════════════
-            // CT records are chunked per employee to stay under Firestore's 1MB document limit
             async function saveCTData() {
                 if (!currentUser || !ctDays.length) return;
                 try {
                     const batch = db.batch();
                     for (const day of ctDays) {
-                        // Group records by employee to keep each doc small
                         const byEmp = {};
                         for (const r of day.records) {
                             if (!byEmp[r.employee]) byEmp[r.employee] = [];
@@ -3408,50 +3531,6 @@
                     await batch.commit();
                 } catch (e) {
                     console.error("saveCTData error:", e);
-                }
-            }
-
-            async function loadCTData() {
-                if (!currentUser) {
-                    ctDays = [];
-                    return;
-                }
-                try {
-                    const daysSnap = await db.collection("ctDays").get();
-                    const result = [];
-                    for (const dayDoc of daysSnap.docs) {
-                        const date = dayDoc.id;
-                        const empSnap = await db
-                            .collection("ctDays")
-                            .doc(date)
-                            .collection("employees")
-                            .get();
-                        const records = [];
-                        for (const empDoc of empSnap.docs) {
-                            const d = empDoc.data();
-                            for (const r of d.records || []) {
-                                records.push({
-                                    action: r.a,
-                                    supervisor: r.s,
-                                    job_title: r.j,
-                                    employee: d.employee,
-                                    timestamp: r.t,
-                                });
-                            }
-                        }
-                        result.push({
-                            date,
-                            filename: dayDoc.data().filename || "",
-                            records,
-                        });
-                    }
-                    ctDays = result.sort((a, b) =>
-                        a.date.localeCompare(b.date),
-                    );
-                    const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-                    ctDays = ctDays.filter((d) => DATE_RE.test(d.date));
-                } catch (e) {
-                    ctDays = [];
                 }
             }
 
@@ -3584,7 +3663,10 @@
                 }
                 if (name === "cycletime") {
                     setCTDateRange();
-                    renderCycleTime();
+                    // Lazy-load CT data for this date range, then render
+                    const from = document.getElementById("date-from").value;
+                    const to = document.getElementById("date-to").value;
+                    loadCTData(from, to).then(() => renderCycleTime());
                 } else {
                     if (leavingCT) restoreFullDateRange();
                     if (name === "trends") renderTrends();
@@ -3683,10 +3765,9 @@
             }
 
             function updateDateRange() {
-                const perfDates = allDays.map((d) => d.date);
-                const ctDatesList = ctDays.map((d) => d.date);
+                // Use the full metadata list for picker bounds — not just loaded data
                 const allDates = [
-                    ...new Set([...perfDates, ...ctDatesList]),
+                    ...new Set([...availablePerfDates, ...availableCTDates]),
                 ].sort();
                 if (!allDates.length) return;
                 const fromEl = document.getElementById("date-from");
@@ -3694,12 +3775,10 @@
 
                 if (!fromEl.value && !toEl.value) {
                     if (currentUserRole === "manager") {
-                        // Managers always default to prior calendar week
                         const { from, to } = getPriorWeekRange();
                         fromEl.value = from;
                         toEl.value = to;
                     } else {
-                        // Admins default to most recent 7 available days
                         const latest = allDates[allDates.length - 1];
                         const weekAgo =
                             allDates.length >= 7
@@ -3709,6 +3788,7 @@
                         toEl.value = latest;
                     }
                 }
+                // Bounds always reflect full available history
                 fromEl.min = allDates[0];
                 fromEl.max = allDates[allDates.length - 1];
                 toEl.min = allDates[0];
@@ -3716,10 +3796,8 @@
             }
 
             function resetDateRange() {
-                const perfDates = allDays.map((d) => d.date);
-                const ctDatesList = ctDays.map((d) => d.date);
                 const allDates = [
-                    ...new Set([...perfDates, ...ctDatesList]),
+                    ...new Set([...availablePerfDates, ...availableCTDates]),
                 ].sort();
                 if (!allDates.length) return;
 
@@ -3741,8 +3819,10 @@
 
             // Switch date pickers to CT-only date range when on Cycle Time tab
             function setCTDateRange() {
-                if (!ctDays.length) return;
-                const ctDates = ctDays.map((d) => d.date).sort();
+                const ctDates = availableCTDates.length
+                    ? availableCTDates
+                    : ctDays.map((d) => d.date).sort();
+                if (!ctDates.length) return;
                 const fromEl = document.getElementById("date-from");
                 const toEl = document.getElementById("date-to");
                 const latest = ctDates[ctDates.length - 1];
@@ -3760,10 +3840,8 @@
 
             // Restore full combined date range when leaving Cycle Time tab
             function restoreFullDateRange() {
-                const perfDates = allDays.map((d) => d.date);
-                const ctDatesList = ctDays.map((d) => d.date);
                 const allDates = [
-                    ...new Set([...perfDates, ...ctDatesList]),
+                    ...new Set([...availablePerfDates, ...availableCTDates]),
                 ].sort();
                 if (!allDates.length) return;
                 const fromEl = document.getElementById("date-from");
@@ -3795,13 +3873,16 @@
             }
 
             function applyFilters() {
-                renderAll();
-                const page = getActivePage();
-                if (page === "managers") renderManagers();
-                else if (page === "employees") renderEmployeeCards();
-                else if (page === "trends") renderTrends();
-                else if (page === "history") renderHistory();
-                else if (page === "cycletime") renderCycleTime();
+                // Fetch any data needed for the new date range, then re-render
+                fetchDataForDateRange().then(() => {
+                    renderAll();
+                    const page = getActivePage();
+                    if (page === "managers") renderManagers();
+                    else if (page === "employees") renderEmployeeCards();
+                    else if (page === "trends") renderTrends();
+                    else if (page === "history") renderHistory();
+                    else if (page === "cycletime") renderCycleTime();
+                });
             }
 
             function updateLocationFilter() {
@@ -4496,6 +4577,18 @@
                     .flatMap((d) => d.records);
             }
 
+            // Returns ALL CT records from the last 6 months — used for stable baseline averages
+            // Ignores the date pickers so coaching thresholds don't shift with the selected view window
+            function get6MonthCTRecords() {
+                const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+                const sixMonthsAgo = new Date();
+                sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+                const cutoff = sixMonthsAgo.toISOString().split("T")[0];
+                return ctDays
+                    .filter((d) => DATE_RE.test(d.date) && d.date >= cutoff)
+                    .flatMap((d) => d.records);
+            }
+
             function getManagerCycleAvg(managerName) {
                 if (!ctDays.length) return null;
                 const allRecords = getFilteredCTRecords().filter(
@@ -4637,10 +4730,11 @@
                     empStatsMap[n].rows.push(r);
                 });
 
-                // Pre-compute dept avg for "Return Item Processed" — Returns Clerk rule (reused below)
-                const _headerCTRecords = getFilteredCTRecords();
+                // Pre-compute 6-month dept avg for "Return Item Processed" — stable baseline for Returns Clerk rule
+                const _baselineCTRecords = get6MonthCTRecords();
+                const _headerCTRecords = getFilteredCTRecords(); // employee's own period records
                 const _headerIPFStats = calcCycleStats(
-                    _headerCTRecords.filter(
+                    _baselineCTRecords.filter(
                         (r) => r.action === "Return Item Processed",
                     ),
                     ctThreshold,
@@ -4720,10 +4814,11 @@
                     empMapForFlags[n].rows.push(r);
                 });
 
-                // Pre-compute dept avg cycle time for "Return Item Processed" (Returns Clerk action)
+                // Pre-compute 6-month dept avg for "Return Item Processed" — stable baseline
                 const RETURNS_ACTION = "Return Item Processed";
-                const allCTRecords = getFilteredCTRecords();
-                const returnsIPFRecords = allCTRecords.filter(
+                const allCTRecords = getFilteredCTRecords(); // selected period — for employee lookups
+                const baselineCTRecs = get6MonthCTRecords(); // 6-month window — for dept baseline
+                const returnsIPFRecords = baselineCTRecs.filter(
                     (r) => r.action === RETURNS_ACTION,
                 );
                 const returnsIPFStats = calcCycleStats(
@@ -4784,7 +4879,7 @@
               <div class="chart-card-title" style="color:${doneCount === flaggedEmps.length ? "var(--accent-green)" : "var(--accent-red)"}">
                 ${doneCount === flaggedEmps.length ? "✓ Coaching Complete" : "Coaching Required"}
               </div>
-              <div class="chart-card-sub">${doneCount} of ${flaggedEmps.length} coached · click a tile to mark complete</div>
+              <div class="chart-card-sub">${doneCount} of ${flaggedEmps.length} coached · click a tile to mark complete${deptIPFAvg !== null ? ` · 6-mo return avg: ${fmtSec(deptIPFAvg)}` : ""}</div>
             </div>
           </div>
           <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px">
@@ -5116,7 +5211,7 @@
                                                 r.action === RETURNS_ACTION,
                                         ),
                                         ctThreshold,
-                                    ).filter((s) => s.avgCycle > 0);
+                                    ).filter((s) => s.avgCycle > 0); // employee uses selected period
                                     return empR.length
                                         ? empR[0].avgCycle > deptIPFAvg
                                         : false;
@@ -6241,6 +6336,11 @@
             function deleteDay(date) {
                 if (!confirm(`Delete data for ${date}?`)) return;
                 allDays = allDays.filter((d) => d.date !== date);
+                // Evict from cache so that if the date range is re-selected,
+                // loadData() does not skip re-fetching a now-deleted document.
+                perfCache.delete(date);
+                // Remove from metadata list so date pickers no longer show it.
+                availablePerfDates = availablePerfDates.filter((d) => d !== date);
                 deleteDayFromDB(date); // fire and forget
                 renderAll();
                 renderHistory();
@@ -7171,19 +7271,72 @@
             // INIT
             // ══════════════════════════════════════════
             async function initApp() {
-                await loadData();
-                await loadCTData();
+                // Step 1: Resolve role so we know if manager or admin (no data needed yet)
                 await resolveUserRole();
+
+                // Step 1b: Fetch just the list of available dates (no row data) — fast metadata read
+                // This lets us set date picker bounds to the full history before loading any records
+                await fetchAvailableDates();
+
+                // Step 2: Set default date values AND apply min/max bounds from full available history
+                if (currentUserRole === "manager") {
+                    const { from, to } = getPriorWeekRange();
+                    document.getElementById("date-from").value = from;
+                    document.getElementById("date-to").value = to;
+                } else {
+                    // Admin: default to most recent 7 available days
+                    const allDates = [
+                        ...new Set([
+                            ...availablePerfDates,
+                            ...availableCTDates,
+                        ]),
+                    ].sort();
+                    const latest = allDates.length
+                        ? allDates[allDates.length - 1]
+                        : new Date().toISOString().split("T")[0];
+                    const week = new Date(latest);
+                    week.setDate(week.getDate() - 7);
+                    document.getElementById("date-from").value = week
+                        .toISOString()
+                        .split("T")[0];
+                    document.getElementById("date-to").value = latest;
+                }
+                // Apply full-history bounds to pickers immediately
+                updateDateRange();
+
+                // Step 3: Load only the performance data for the current date window
+                await loadData();
+
+                // Step 4: Update location filter and render immediately with what we have
+                updateLocationFilter();
                 renderAll();
-                // Also render the active page so data shows immediately without tab switching
+
+                // Step 5: Render the active page
                 const page = getActivePage();
                 if (page === "managers") renderManagers();
                 if (page === "employees") renderEmployeeCards();
                 if (page === "trends") renderTrends();
-                if (page === "cycletime") renderCycleTime();
                 if (page === "history") renderHistory();
-                updateDateRange();
-                applyFilters();
+
+                // Step 6: Load CT data lazily only if on cycle time tab, else defer to tab navigation
+                if (page === "cycletime") {
+                    const from = document.getElementById("date-from").value;
+                    const to = document.getElementById("date-to").value;
+                    await loadCTData(from, to);
+                    renderCycleTime();
+                }
+            }
+
+            // Called when user changes date range — fetch any newly needed data
+            async function fetchDataForDateRange() {
+                const from = document.getElementById("date-from").value;
+                const to = document.getElementById("date-to").value;
+                if (!from || !to) return;
+                await loadData(); // loadData already scopes to the selected date range
+                const page = getActivePage();
+                if (page === "cycletime") {
+                    await loadCTData(from, to);
+                }
             }
 
             // Auth handles initApp via onAuthStateChanged — no direct call needed
