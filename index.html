@@ -762,6 +762,26 @@
                 background: var(--accent-cyan);
             }
 
+            /* ─── RANKING HIGHLIGHTS ─── */
+            /* Gold row = #1 ranked employee by PPH */
+            .ranking-gold {
+                background: rgba(245, 197, 24, 0.08) !important;
+                border-left: 3px solid #f5c518;
+            }
+            .ranking-gold td:first-child {
+                color: #f5c518 !important;
+                font-weight: 700;
+            }
+            /* Red row = last ranked employee by PPH */
+            .ranking-red {
+                background: rgba(248, 81, 73, 0.08) !important;
+                border-left: 3px solid var(--accent-red);
+            }
+            .ranking-red td:first-child {
+                color: var(--accent-red) !important;
+                font-weight: 700;
+            }
+
             /* ─── EMPLOYEE PAGE ─── */
             .search-input {
                 background: var(--bg-card);
@@ -2238,7 +2258,6 @@
                                         <th>Direct Hrs</th>
                                         <th>Indirect Hrs</th>
                                         <th>Total Hrs</th>
-                                        <th>Performance</th>
                                     </tr>
                                 </thead>
                                 <tbody id="ranking-body"></tbody>
@@ -5835,7 +5854,8 @@
                     empMap[n].rows.push(r);
                 });
 
-                const emps = Object.values(empMap)
+                // Build full sorted list — all employees are displayed regardless of direct %
+                const allEmps = Object.values(empMap)
                     .map((e) => ({
                         name: e.name,
                         supervisor: e.supervisor,
@@ -5848,18 +5868,34 @@
                     }))
                     .sort((a, b) => b.pph - a.pph);
 
-                const maxPPH = Math.max(...emps.map((e) => e.pph), 0);
+                // Gold/red highlights only apply to employees with >50% direct hours.
+                // Employees under 50% are still shown but receive no highlight class.
+                const qualifiedEmps = allEmps.filter(
+                    (e) => e.totalHrs > 0 && e.directHrs / e.totalHrs > 0.5,
+                );
+                const goldName =
+                    qualifiedEmps.length > 0 ? qualifiedEmps[0].name : null;
+                const redName =
+                    qualifiedEmps.length > 1
+                        ? qualifiedEmps[qualifiedEmps.length - 1].name
+                        : null;
 
-                document.getElementById("ranking-body").innerHTML = emps
+                document.getElementById("ranking-body").innerHTML = allEmps
                     .map((e, i) => {
-                        const pct = maxPPH > 0 ? (e.pph / maxPPH) * 100 : 0;
                         const gapColor =
                             e.gap > 0.1
                                 ? COLORS.red
                                 : e.gap > 0.06
                                   ? COLORS.amber
                                   : COLORS.green;
-                        return `<tr>
+                        // Gold = highest PPH among qualified; red = lowest PPH among qualified
+                        const rowClass =
+                            e.name === goldName
+                                ? "ranking-gold"
+                                : e.name === redName
+                                  ? "ranking-red"
+                                  : "";
+                        return `<tr class="${rowClass}">
       <td class="mono" style="color:var(--text-muted)">${i + 1}</td>
       <td style="color:var(--text-primary);font-weight:500">${e.name}</td>
       <td>${e.supervisor}</td>
@@ -5869,7 +5905,6 @@
       <td class="mono">${e.directHrs.toFixed(1)}</td>
       <td class="mono">${e.indirectHrs.toFixed(1)}</td>
       <td class="mono">${e.totalHrs.toFixed(1)}</td>
-      <td><div class="perf-bar-wrap"><div class="perf-bar" style="width:${pct.toFixed(0)}%"></div></div></td>
     </tr>`;
                     })
                     .join("");
