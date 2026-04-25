@@ -1756,6 +1756,22 @@
                     display: none !important;
                 }
             }
+
+            /* ─── COACHING CARDS (CT landing page + manager coaching panel) ─── */
+            .coaching-manager-section { margin-bottom: 2rem; }
+            .coaching-manager-header { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); margin-bottom: 0.75rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); }
+            .coaching-cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+            .coaching-emp-card { padding: 1rem; border-radius: 8px; border: 1px solid var(--border); cursor: pointer; transition: transform 0.15s, box-shadow 0.15s; }
+            .coaching-emp-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+            .coaching-emp-card.status-assigned { background: rgba(248,81,73,0.08); border-color: var(--accent-red); }
+            .coaching-emp-card.status-submitted { background: rgba(63,185,80,0.08); border-color: var(--accent-green); }
+            .coaching-emp-card.status-locked { background: rgba(63,185,80,0.08); border-color: var(--accent-green); }
+            .coaching-emp-card.status-unassigned { background: var(--bg-card); }
+            .coaching-emp-name { font-weight: 600; font-size: 0.9rem; color: var(--text-primary); margin-bottom: 0.25rem; }
+            .coaching-emp-status { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; }
+            .coaching-emp-card.status-assigned .coaching-emp-status { color: var(--accent-red); }
+            .coaching-emp-card.status-submitted .coaching-emp-status,
+            .coaching-emp-card.status-locked .coaching-emp-status { color: var(--accent-green); }
         </style>
     </head>
     <body>
@@ -2061,6 +2077,25 @@
                         <polyline points="12 6 12 12 16 14" />
                     </svg>
                     <span>Data History</span>
+                </div>
+                <!-- Coaching nav — CT role only; hidden for admin/manager by default -->
+                <div
+                    class="nav-item"
+                    data-label="Coaching"
+                    data-page="coaching"
+                    onclick="showPage('coaching', this)"
+                    style="display:none;"
+                >
+                    <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                    >
+                        <circle cx="12" cy="12" r="3" />
+                        <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83" />
+                    </svg>
+                    <span>Coaching</span>
                 </div>
             </nav>
 
@@ -3141,6 +3176,30 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- COACHING PAGE — visible to CT users only -->
+                <div class="page" id="page-coaching">
+                    <div class="page-header" style="margin-bottom:1.5rem;">
+                        <div style="font-size:1.1rem; font-weight:600; color:var(--text-primary);">My Coaching Assignments</div>
+                        <div style="font-size:0.85rem; color:var(--text-muted); margin-top:0.25rem;">Employees assigned to you for coaching</div>
+                    </div>
+                    <!-- Assignment card grid — populated by renderCTCoachingPage() -->
+                    <div id="coaching-assignments-container"></div>
+                    <!-- CT Employee detail view (hidden by default) -->
+                    <div id="ct-employee-detail" style="display:none;">
+                        <button onclick="closeCTEmployeeDetail()" style="margin-bottom:1rem; padding:0.4rem 1rem; background:var(--bg-card); border:1px solid var(--border); border-radius:6px; color:var(--text-muted); cursor:pointer; font-size:0.85rem;">← Back to Assignments</button>
+                        <div id="ct-employee-stats"></div>
+                        <div id="coaching-form-container" style="margin-top:1.5rem;">
+                            <div style="padding:1.5rem; background:var(--bg-card); border:1px solid var(--border); border-radius:8px; color:var(--text-muted); font-size:0.9rem; text-align:center;">
+                                Coaching form coming soon
+                            </div>
+                        </div>
+                        <button id="ct-submit-coaching-btn" disabled style="margin-top:1.5rem; width:100%; padding:0.75rem; background:var(--accent-green-dim); color:var(--accent-green); border:1px solid var(--accent-green); border-radius:6px; font-weight:600; font-size:0.95rem; cursor:not-allowed; opacity:0.5;">
+                            Submit Coaching
+                        </button>
+                    </div>
+                </div>
+
             </div>
         </div>
 
@@ -3388,6 +3447,10 @@
             // Set when a valid invite token is found in the URL; consumed during handleCTSignup().
             let pendingInviteToken = null;
             let pendingInviteData = null;
+
+            // ── CT Coaching page state ──
+            let ctCoachingListener = null;   // onSnapshot unsubscribe fn — cleaned up on page leave
+            let currentCTCoachingId = null;  // ID of coaching doc currently being viewed
 
             // Extract first name from email: "cameron.hodges@co.com" → "cameron"
             function firstNameFromEmail(email) {
@@ -4066,6 +4129,126 @@
             }
 
             // ══════════════════════════════════════════
+            // CT COACHING PAGE
+            // ══════════════════════════════════════════
+
+            // Real-time listener for the CT's coaching assignments.
+            // Groups cards by manager and renders them into #coaching-assignments-container.
+            function renderCTCoachingPage() {
+                // Tear down any previous listener before creating a new one
+                if (ctCoachingListener) { ctCoachingListener(); ctCoachingListener = null; }
+
+                const container = document.getElementById("coaching-assignments-container");
+                if (!container) return;
+                container.innerHTML = '<div style="color:var(--text-muted); font-size:0.9rem;">Loading assignments…</div>';
+
+                ctCoachingListener = db.collection("coachings")
+                    .where("ctId", "==", currentUser.uid)
+                    .onSnapshot(snap => {
+                        const coachings = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+                        if (!coachings.length) {
+                            container.innerHTML = '<div style="color:var(--text-muted); font-size:0.9rem; padding:2rem; text-align:center;">No coaching assignments yet.</div>';
+                            return;
+                        }
+
+                        // Group assignments by managerId so cards are section-labeled by manager
+                        const byManager = {};
+                        for (const c of coachings) {
+                            if (!byManager[c.managerId]) byManager[c.managerId] = { name: c.managerName, items: [] };
+                            byManager[c.managerId].items.push(c);
+                        }
+
+                        container.innerHTML = Object.values(byManager).map(group => `
+                            <div class="coaching-manager-section">
+                                <div class="coaching-manager-header">${group.name || "Manager"}</div>
+                                <div class="coaching-cards-grid">
+                                    ${group.items.map(c => `
+                                        <div class="coaching-emp-card status-${c.status || 'assigned'}"
+                                             onclick="showCTEmployeePage('${c.id}', '${c.employeeName.replace(/'/g,"\\'")}')">
+                                            <div class="coaching-emp-name">${c.employeeName}</div>
+                                            <div class="coaching-emp-status">${c.status === 'locked' ? 'Locked' : c.status === 'submitted' ? 'Submitted' : 'Needs Coaching'}</div>
+                                        </div>
+                                    `).join("")}
+                                </div>
+                            </div>
+                        `).join("");
+                    }, err => {
+                        console.error("CT coaching snapshot error:", err);
+                        container.innerHTML = '<div style="color:var(--accent-red); font-size:0.9rem;">Error loading assignments.</div>';
+                    });
+            }
+
+            // Navigate into an employee detail view from the CT coaching assignments list.
+            // Fetches the last 30 days of performance data from Firestore directly
+            // (CT users skip loadData() so perfCache / allDays are always empty for them).
+            async function showCTEmployeePage(coachingId, employeeName) {
+                currentCTCoachingId = coachingId;
+
+                // Hide assignment list, show detail
+                document.getElementById("coaching-assignments-container").style.display = "none";
+                document.getElementById("ct-employee-detail").style.display = "block";
+
+                const statsEl = document.getElementById("ct-employee-stats");
+                statsEl.innerHTML = `<div style="color:var(--text-muted); font-size:0.9rem;">Loading ${employeeName}'s stats…</div>`;
+
+                try {
+                    // Read last 30 performance day docs, filter to this employee's rows
+                    const snap = await db.collection("performanceDays").orderBy("date", "desc").limit(30).get();
+                    const empRows = [];
+                    for (const doc of snap.docs) {
+                        const rows = (doc.data().rows || []).filter(r => r.EMPLOYEE === employeeName);
+                        empRows.push(...rows);
+                    }
+
+                    if (!empRows.length) {
+                        statsEl.innerHTML = `<div style="color:var(--text-muted); font-size:0.9rem;">No performance data found for ${employeeName}.</div>`;
+                        return;
+                    }
+
+                    const pph = weightedPPH(empRows).toFixed(1);
+                    const gap = (avg(empRows, "GAP %") * 100).toFixed(1);
+                    const directH = sum(empRows, "DIRECT HOURS").toFixed(0);
+                    const totalH = sum(empRows, "TOTAL HOURS").toFixed(0);
+
+                    statsEl.innerHTML = `
+                        <div style="margin-bottom:1rem;">
+                            <div style="font-size:1.1rem; font-weight:700; color:var(--text-primary); margin-bottom:0.25rem;">${employeeName}</div>
+                            <div style="font-size:0.8rem; color:var(--text-muted);">Last 30 days of available data</div>
+                        </div>
+                        <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:10px; margin-bottom:1rem;">
+                            <div style="padding:0.75rem; background:var(--bg-card); border:1px solid var(--border); border-radius:8px;">
+                                <div style="font-size:0.7rem; text-transform:uppercase; color:var(--text-muted); letter-spacing:0.06em;">Avg PPH</div>
+                                <div style="font-size:1.4rem; font-weight:700; color:var(--accent-cyan); font-family:'JetBrains Mono',monospace;">${pph}</div>
+                            </div>
+                            <div style="padding:0.75rem; background:var(--bg-card); border:1px solid var(--border); border-radius:8px;">
+                                <div style="font-size:0.7rem; text-transform:uppercase; color:var(--text-muted); letter-spacing:0.06em;">Avg GAP%</div>
+                                <div style="font-size:1.4rem; font-weight:700; color:var(--accent-amber); font-family:'JetBrains Mono',monospace;">${gap}%</div>
+                            </div>
+                            <div style="padding:0.75rem; background:var(--bg-card); border:1px solid var(--border); border-radius:8px;">
+                                <div style="font-size:0.7rem; text-transform:uppercase; color:var(--text-muted); letter-spacing:0.06em;">Direct Hours</div>
+                                <div style="font-size:1.4rem; font-weight:700; color:var(--accent-green); font-family:'JetBrains Mono',monospace;">${directH}h</div>
+                            </div>
+                            <div style="padding:0.75rem; background:var(--bg-card); border:1px solid var(--border); border-radius:8px;">
+                                <div style="font-size:0.7rem; text-transform:uppercase; color:var(--text-muted); letter-spacing:0.06em;">Total Hours</div>
+                                <div style="font-size:1.4rem; font-weight:700; color:var(--text-primary); font-family:'JetBrains Mono',monospace;">${totalH}h</div>
+                            </div>
+                        </div>
+                    `;
+                } catch (e) {
+                    console.error("CT employee stats error:", e);
+                    statsEl.innerHTML = `<div style="color:var(--accent-red); font-size:0.9rem;">Error loading stats for ${employeeName}.</div>`;
+                }
+            }
+
+            // Return from employee detail back to the assignment cards list.
+            function closeCTEmployeeDetail() {
+                currentCTCoachingId = null;
+                document.getElementById("ct-employee-detail").style.display = "none";
+                document.getElementById("coaching-assignments-container").style.display = "";
+            }
+
+            // ══════════════════════════════════════════
             // ══════════════════════════════════════════
             // NAV
             // ══════════════════════════════════════════
@@ -4087,6 +4270,7 @@
                     trends: "Trends",
                     history: "Data History",
                     cycletime: "Cycle Time",
+                    coaching: "Coaching",
                 }[name];
                 document.getElementById("breadcrumb").textContent = "/ " + name;
                 if (name !== "employees") {
@@ -4097,7 +4281,10 @@
                     document.getElementById("employees-empty").style.display =
                         allDays.length ? "none" : "block";
                 }
-                if (name === "cycletime") {
+                if (name === "coaching") {
+                    // CT coaching page — real-time listener, no date range or data loading needed
+                    renderCTCoachingPage();
+                } else if (name === "cycletime") {
                     setCTDateRange();
                     // Lazy-load CT data for this date range, then render
                     const from = document.getElementById("date-from").value;
@@ -7989,6 +8176,21 @@
 
                 // Step 1: Resolve role so we know if manager or admin (no data needed yet)
                 await resolveUserRole();
+
+                // CT users get a stripped-down init — only the coaching page, no data loading.
+                // resolveUserRole() sets currentUserRole = "ct" and returns early after hiding
+                // all non-coaching nav items, so we pick up that signal here.
+                if (currentUserRole === "ct") {
+                    // Show the coaching nav item (hidden by default for all roles)
+                    document.querySelectorAll(".nav-item[data-page='coaching']").forEach(n => n.style.display = "");
+                    // Activate the coaching page
+                    document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
+                    const coachingPage = document.getElementById("page-coaching");
+                    if (coachingPage) coachingPage.classList.add("active");
+                    document.getElementById("page-title").textContent = "Coaching";
+                    renderCTCoachingPage();
+                    return; // skip all data loading — CTs don't need performance data
+                }
 
                 // Step 1b: Fetch just the list of available dates (no row data) — fast metadata read
                 // This lets us set date picker bounds to the full history before loading any records
