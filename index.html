@@ -8576,6 +8576,11 @@
                 // This fires before any role check so revoked CTs cannot access any data.
                 const revokedDoc = await db.collection("revokedUsers").doc(currentUser.uid).get();
                 if (revokedDoc.exists) {
+                    // Attempt to delete the Firebase Auth account. The client SDK allows a user
+                    // to delete their own account; this works when the session is recent (login
+                    // or refresh). Silently skip if the session is too old — the signOut() below
+                    // still blocks access via the revokedUsers gate on every future load.
+                    try { await currentUser.delete(); } catch (_) {}
                     await auth.signOut();
                     return;
                 }
