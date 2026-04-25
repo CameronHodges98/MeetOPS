@@ -3537,14 +3537,18 @@
                     // is immediately hidden, so that state is harmless. But on sign-out
                     // (or a failed session restore) we return to the login screen and
                     // must restore the button — otherwise the form is stuck with no way
-                    // to submit. We intentionally do NOT clear the email/password fields
-                    // so browser autofill continues to work normally.
+                    // to submit. Fields are cleared so the next user always sees a blank
+                    // form rather than the previous user's credentials.
                     const _loginBtn  = document.getElementById("login-btn");
                     const _loginLoad = document.getElementById("login-loading");
                     const _loginErr  = document.getElementById("login-error");
-                    if (_loginBtn)  _loginBtn.style.display  = "block";
-                    if (_loginLoad) _loginLoad.style.display = "none";
-                    if (_loginErr)  { _loginErr.style.display = "none"; _loginErr.textContent = ""; }
+                    const _loginEmail = document.getElementById("login-email");
+                    const _loginPass  = document.getElementById("login-password");
+                    if (_loginBtn)   _loginBtn.style.display   = "block";
+                    if (_loginLoad)  _loginLoad.style.display  = "none";
+                    if (_loginErr)   { _loginErr.style.display = "none"; _loginErr.textContent = ""; }
+                    if (_loginEmail) _loginEmail.value = "";
+                    if (_loginPass)  _loginPass.value  = "";
 
                     // Show login, hide app shell
                     document.getElementById("login-screen").style.display = "flex";
