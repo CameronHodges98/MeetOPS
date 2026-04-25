@@ -3478,6 +3478,7 @@
             // Set when a valid invite token is found in the URL; consumed during handleCTSignup().
             let pendingInviteToken = null;
             let pendingInviteData = null;
+            let ctSignupInProgress = false;  // blocks initApp() during CT account creation writes
 
             // ── CT Coaching page state ──
             let ctCoachingListener = null;   // onSnapshot unsubscribe fn — cleaned up on page leave
@@ -3760,21 +3761,29 @@
                 btnEl.style.display = "none";
                 loadEl.style.display = "block";
 
+                // Block onAuthStateChanged from calling initApp() until all writes complete.
+                // Without this, Firebase signs the user in immediately on createUser, which
+                // triggers onAuthStateChanged before certifiedTrainers/{uid} exists — causing
+                // the role check to miss the CT doc and the signup screen to stay visible forever.
+                ctSignupInProgress = true;
+
                 try {
                     const cred = await auth.createUserWithEmailAndPassword(email, password);
                     const uid = cred.user.uid;
-                    // Write CT doc — role will be detected by checkCTRole() on next initApp()
                     await db.collection("certifiedTrainers").doc(uid).set({
                         name,
                         email,
                         createdAt: firebase.firestore.FieldValue.serverTimestamp()
                     });
-                    // Mark invite token as used so it cannot be reused
                     if (pendingInviteToken) {
                         await db.collection("invites").doc(pendingInviteToken).update({ used: true });
                     }
-                    // auth.onAuthStateChanged fires automatically and calls initApp()
+                    // Reload for a clean initApp() — the CT doc now exists so resolveUserRole()
+                    // will correctly identify this user as a CT. The reload also hides this
+                    // signup screen and strips the invite token from the URL.
+                    window.location.reload();
                 } catch (e) {
+                    ctSignupInProgress = false;
                     btnEl.style.display = "block";
                     loadEl.style.display = "none";
                     errEl.textContent = e.message || "Failed to create account. Please try again.";
@@ -3800,7 +3809,12 @@
                     // the parent div would destroy those child spans and break the
                     // layout, causing both the email-display bug and topbar overflow.
                     applyStoredTheme();
-                    await initApp();
+                    // If CT signup writes are still in flight, skip initApp() here —
+                    // handleCTSignup() will window.location.reload() when done, which
+                    // triggers a clean initApp() after the certifiedTrainers doc exists.
+                    if (!ctSignupInProgress) {
+                        await initApp();
+                    }
                 } else {
                     if (wasSignedIn) {
                         // User was signed in during this session and has now signed out.
