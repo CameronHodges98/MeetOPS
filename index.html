@@ -3531,6 +3531,21 @@
                     const locFilter = document.getElementById("location-filter");
                     if (locFilter) locFilter.selectedIndex = 0;
 
+                    // Reset login form to idle state before showing it.
+                    // handleLogin() hides the button and shows "Signing in..." the
+                    // moment the user clicks it. If sign-in succeeds the login screen
+                    // is immediately hidden, so that state is harmless. But on sign-out
+                    // (or a failed session restore) we return to the login screen and
+                    // must restore the button — otherwise the form is stuck with no way
+                    // to submit. We intentionally do NOT clear the email/password fields
+                    // so browser autofill continues to work normally.
+                    const _loginBtn  = document.getElementById("login-btn");
+                    const _loginLoad = document.getElementById("login-loading");
+                    const _loginErr  = document.getElementById("login-error");
+                    if (_loginBtn)  _loginBtn.style.display  = "block";
+                    if (_loginLoad) _loginLoad.style.display = "none";
+                    if (_loginErr)  { _loginErr.style.display = "none"; _loginErr.textContent = ""; }
+
                     // Show login, hide app shell
                     document.getElementById("login-screen").style.display = "flex";
                     document.getElementById("sidebar").style.display = "none";
