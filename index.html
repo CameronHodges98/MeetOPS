@@ -3477,8 +3477,11 @@
                     if (window.innerWidth <= 640)
                         document.getElementById("mobile-nav").style.display =
                             "flex";
-                    document.getElementById("user-badge").textContent =
-                        user.email;
+                    // Do NOT write to #user-badge here — it is now a <div> with
+                    // child spans (#user-display-name, #user-display-role) that
+                    // are populated by resolveUserRole(). Setting .textContent on
+                    // the parent div would destroy those child spans and break the
+                    // layout, causing both the email-display bug and topbar overflow.
                     applyStoredTheme();
                     await initApp();
                 } else {
@@ -7665,6 +7668,13 @@
 
                 // Step 3: Load only the performance data for the current date window
                 await loadData();
+
+                // Step 3b: Re-resolve user role now that allDays is populated.
+                // The Step 1 call above runs with empty allDays (no data yet), so
+                // matchSupervisorFromEmail() returns {status:'no_data'} and the header
+                // falls back to showing the raw email prefix. Now that real rows exist,
+                // re-run it so managers see their matched full supervisor name (e.g. "Alana Sledge").
+                await resolveUserRole();
 
                 // Step 4: Update location filter and render immediately with what we have
                 updateLocationFilter();
