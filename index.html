@@ -782,6 +782,54 @@
                 font-weight: 700;
             }
 
+            /* ─── MANAGER CARD PAIR (snapshot + performers side-by-side) ─── */
+            .mgr-pair {
+                display: flex;
+                gap: 12px;
+                align-items: stretch;
+            }
+            /* Left snapshot card stretches to fill remaining space */
+            .mgr-pair > .manager-card {
+                flex: 1 1 0;
+                min-width: 0;
+            }
+            /* Right performers card — fixed narrow width, same visual style as snapshot card */
+            .mgr-performers-card {
+                flex: 0 0 170px;
+                width: 170px;
+                background: var(--bg-card);
+                border: 1px solid var(--border);
+                border-radius: var(--radius-lg);
+                padding: 14px 14px 12px 14px;
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+            }
+            .mgr-performers-label {
+                font-size: 10px;
+                font-weight: 600;
+                text-transform: uppercase;
+                letter-spacing: 0.6px;
+                color: var(--text-muted);
+            }
+            .mgr-performers-lines {
+                display: flex;
+                flex-direction: column;
+                gap: 6px;
+            }
+            /* ─── MANAGER CARD TOP/BOTTOM PERFORMER BADGES ─── */
+            /* Used inside .mgr-performers-card */
+            .perf-highlight {
+                font-size: 11px;
+                font-family: "JetBrains Mono", monospace;
+                display: flex;
+                align-items: center;
+                gap: 4px;
+                line-height: 1.4;
+            }
+            .perf-highlight.top { color: #f5c518; }
+            .perf-highlight.bottom { color: var(--accent-red); }
+
             /* ─── EMPLOYEE PAGE ─── */
             .search-input {
                 background: var(--bg-card);
@@ -1437,6 +1485,10 @@
                 .manager-grid {
                     grid-template-columns: 1fr;
                 }
+                /* Pairs still sit side-by-side at tablet width */
+                .mgr-pair {
+                    flex-direction: row;
+                }
                 .manager-kpis {
                     grid-template-columns: repeat(3, 1fr) !important;
                 }
@@ -1565,6 +1617,15 @@
                 }
 
                 /* Manager cards */
+                /* Stack the pair vertically on small screens so the performers card
+                   doesn't get squeezed too narrow */
+                .mgr-pair {
+                    flex-direction: column;
+                }
+                .mgr-performers-card {
+                    width: 100%;
+                    flex: none;
+                }
                 .manager-kpis {
                     grid-template-columns: repeat(2, 1fr) !important;
                 }
@@ -4865,6 +4926,37 @@
                 }));
             }
 
+            // Returns the top and bottom PPH performers for a given set of employee rows.
+            // Uses the same ">50% direct hours" qualification rule as renderRankingTable.
+            // Returns { topName, bottomName } — either field is null if there are not enough
+            // qualifying employees (bottomName is null when only one qualifies).
+            function getTopBottomPerformer(rows) {
+                // Aggregate all rows by employee name
+                const empMap = {};
+                rows.forEach((r) => {
+                    const n = r["EMPLOYEE"];
+                    if (!n) return;
+                    if (!empMap[n]) empMap[n] = { name: n, rows: [] };
+                    empMap[n].rows.push(r);
+                });
+
+                // Build stats and filter to employees with >50% direct hours (same rule as ranking table)
+                const qualified = Object.values(empMap)
+                    .map((e) => ({
+                        name: e.name,
+                        pph: weightedPPH(e.rows),
+                        directHrs: sum(e.rows, "DIRECT HOURS"),
+                        totalHrs: sum(e.rows, "TOTAL HOURS"),
+                    }))
+                    .filter((e) => e.totalHrs > 0 && e.directHrs / e.totalHrs > 0.5)
+                    .sort((a, b) => b.pph - a.pph);
+
+                return {
+                    topName: qualified.length > 0 ? qualified[0].name : null,
+                    bottomName: qualified.length > 1 ? qualified[qualified.length - 1].name : null,
+                };
+            }
+
             function getManagerTrend(mgrName) {
                 if (allDays.length < 2) return "neutral";
                 const vals = allDays
@@ -4947,24 +5039,46 @@
                             "var(--accent-amber)",
                             "var(--accent-purple)",
                         ][i % 4];
-                        return `<div class="manager-card" onclick="drillManager('${m.name.replace(/'/g, "\\'")}')">
-      <div class="manager-card-header">
-        <div class="manager-info">
-          <div class="manager-avatar" style="background:${color}22;color:${color}">${getInitials(m.name)}</div>
-          <div>
-            <div class="manager-name">${m.name}</div>
-            <div class="manager-meta">${m.count} employees · ${m.location || "N/A"}</div>
-          </div>
+
+                        // Compute top/bottom performer for this manager's team using the
+                        // same >50% direct hours qualification rule as the ranking table.
+                        const mgrRows = rows.filter((r) => r["SUPERVISOR"] === m.name);
+                        const { topName, bottomName } = getTopBottomPerformer(mgrRows);
+
+                        // Right card: "Team Spotlight" with top/bottom performer names.
+                        // Only rendered when at least one qualifying employee exists.
+                        const performersCard = topName
+                            ? `<div class="mgr-performers-card">
+        <div class="mgr-performers-label">Team Spotlight</div>
+        <div class="mgr-performers-lines">
+          <span class="perf-highlight top">▲ Top: ${topName}</span>
+          ${bottomName ? `<span class="perf-highlight bottom">▼ Bottom: ${bottomName}</span>` : ""}
         </div>
-        <span class="trend-pill ${trend}">${trendLabel}</span>
-      </div>
-      <div class="manager-kpis" style="grid-template-columns:repeat(5,1fr)">
-        <div><div class="mgr-kpi-label">Avg PPH</div><div class="mgr-kpi-val" style="color:${color}">${m.avgPPH.toFixed(1)}</div></div>
-        <div><div class="mgr-kpi-label">GAP%</div><div class="mgr-kpi-val">${(m.avgGAP * 100).toFixed(1)}%</div></div>
-        <div><div class="mgr-kpi-label">Direct Hrs</div><div class="mgr-kpi-val">${m.directHrs.toFixed(0)}</div></div>
-        <div><div class="mgr-kpi-label">Total Hrs</div><div class="mgr-kpi-val">${m.totalHrs.toFixed(0)}</div></div>
-        <div><div class="mgr-kpi-label">Avg Cycle</div><div class="mgr-kpi-val" style="color:var(--accent-purple)">${((ctAvg) => (ctAvg !== null ? fmtSec(ctAvg) : "—"))(getManagerCycleAvg(m.name))}</div></div>
-      </div>
+      </div>`
+                            : "";
+
+                        // Each manager renders as a pair: snapshot card (left) + performers card (right).
+                        // The .mgr-pair container uses flex so the right card sits beside the snapshot.
+                        return `<div class="mgr-pair">
+      <div class="manager-card" onclick="drillManager('${m.name.replace(/'/g, "\\'")}')">
+        <div class="manager-card-header">
+          <div class="manager-info">
+            <div class="manager-avatar" style="background:${color}22;color:${color}">${getInitials(m.name)}</div>
+            <div>
+              <div class="manager-name">${m.name}</div>
+              <div class="manager-meta">${m.count} employees · ${m.location || "N/A"}</div>
+            </div>
+          </div>
+          <span class="trend-pill ${trend}">${trendLabel}</span>
+        </div>
+        <div class="manager-kpis" style="grid-template-columns:repeat(5,1fr)">
+          <div><div class="mgr-kpi-label">Avg PPH</div><div class="mgr-kpi-val" style="color:${color}">${m.avgPPH.toFixed(1)}</div></div>
+          <div><div class="mgr-kpi-label">GAP%</div><div class="mgr-kpi-val">${(m.avgGAP * 100).toFixed(1)}%</div></div>
+          <div><div class="mgr-kpi-label">Direct Hrs</div><div class="mgr-kpi-val">${m.directHrs.toFixed(0)}</div></div>
+          <div><div class="mgr-kpi-label">Total Hrs</div><div class="mgr-kpi-val">${m.totalHrs.toFixed(0)}</div></div>
+          <div><div class="mgr-kpi-label">Avg Cycle</div><div class="mgr-kpi-val" style="color:var(--accent-purple)">${((ctAvg) => (ctAvg !== null ? fmtSec(ctAvg) : "—"))(getManagerCycleAvg(m.name))}</div></div>
+        </div>
+      </div>${performersCard}
     </div>`;
                     })
                     .join("");
