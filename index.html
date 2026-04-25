@@ -2936,6 +2936,7 @@
                             + Upload New
                         </button>
                     </div>
+                    <!-- Performance upload history -->
                     <div id="history-list-wrap">
                         <div class="empty-state" id="history-empty">
                             <div class="empty-icon">
@@ -2959,6 +2960,40 @@
                             id="history-list"
                             style="display: none"
                         ></div>
+                    </div>
+
+                    <!-- Cycle time upload history -->
+                    <div style="margin-top: 28px">
+                        <div class="section-header" style="margin-bottom: 12px">
+                            <div class="section-title">
+                                <div class="dot"></div>
+                                Cycle Time Files
+                            </div>
+                        </div>
+                        <div id="ct-history-list-wrap">
+                            <div class="empty-state" id="ct-history-empty">
+                                <div class="empty-icon">
+                                    <svg
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        stroke-width="1.5"
+                                    >
+                                        <circle cx="12" cy="12" r="10" />
+                                        <polyline points="12 6 12 12 16 14" />
+                                    </svg>
+                                </div>
+                                <div class="empty-title">No cycle time files uploaded</div>
+                                <div class="empty-sub">
+                                    Cycle time upload history will appear here.
+                                </div>
+                            </div>
+                            <div
+                                class="history-list"
+                                id="ct-history-list"
+                                style="display: none"
+                            ></div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -6265,42 +6300,69 @@
             // HISTORY PAGE
             // ══════════════════════════════════════════
             function renderHistory() {
+                // ── Performance days section ──────────────────────────────
                 const list = document.getElementById("history-list");
                 const empty = document.getElementById("history-empty");
                 if (!allDays.length) {
                     list.style.display = "none";
                     empty.style.display = "block";
-                    return;
-                }
-                list.style.display = "block";
-                empty.style.display = "none";
-                const loc = document.getElementById("location-filter").value;
-                list.innerHTML = allDays
-                    .slice()
-                    .reverse()
-                    .map((d) => {
-                        const rows =
-                            loc === "all"
-                                ? d.rows
-                                : d.rows.filter((r) => r.LOCATION === loc);
-                        const locs = [
-                            ...new Set(
-                                d.rows.map((r) => r.LOCATION).filter(Boolean),
-                            ),
-                        ];
-                        return `<div class="history-row">
+                } else {
+                    list.style.display = "block";
+                    empty.style.display = "none";
+                    const loc = document.getElementById("location-filter").value;
+                    list.innerHTML = allDays
+                        .slice()
+                        .reverse()
+                        .map((d) => {
+                            const rows =
+                                loc === "all"
+                                    ? d.rows
+                                    : d.rows.filter((r) => r.LOCATION === loc);
+                            const locs = [
+                                ...new Set(
+                                    d.rows.map((r) => r.LOCATION).filter(Boolean),
+                                ),
+                            ];
+                            return `<div class="history-row">
       <span class="history-date">${d.date}</span>
       <span class="history-badge">${d.rows.length} employees</span>
       ${locs.map((l) => `<span class="location-tag">${l}</span>`).join("")}
       <span class="history-meta">Avg PPH: ${weightedPPH(rows).toFixed(1)} · GAP: ${(avg(rows, "GAP %") * 100).toFixed(1)}%</span>
       <button class="delete-btn" onclick="deleteDay('${d.date}')" title="Delete">✕</button>
     </div>`;
-                    })
-                    .join("");
+                        })
+                        .join("");
+                }
+
+                // ── Cycle time days section ───────────────────────────────
+                const ctList = document.getElementById("ct-history-list");
+                const ctEmpty = document.getElementById("ct-history-empty");
+                if (!ctDays.length) {
+                    ctList.style.display = "none";
+                    ctEmpty.style.display = "block";
+                } else {
+                    ctList.style.display = "block";
+                    ctEmpty.style.display = "none";
+                    ctList.innerHTML = ctDays
+                        .slice()
+                        .reverse()
+                        .map((d) => {
+                            const empCount = new Set(
+                                d.records.map((r) => r.employee),
+                            ).size;
+                            return `<div class="history-row">
+      <span class="history-date">${d.date}</span>
+      <span class="history-badge">${d.records.length} records</span>
+      <span class="history-meta">${empCount} employees · ${d.filename || "cycle time"}</span>
+      <button class="delete-btn" onclick="deleteCTDay('${d.date}')" title="Delete">✕</button>
+    </div>`;
+                        })
+                        .join("");
+                }
             }
 
             function deleteDay(date) {
-                if (!confirm(`Delete data for ${date}?`)) return;
+                if (!confirm(`Delete performance data for ${date}?`)) return;
                 allDays = allDays.filter((d) => d.date !== date);
                 // Evict from cache so that if the date range is re-selected,
                 // loadData() does not skip re-fetching a now-deleted document.
@@ -6310,6 +6372,39 @@
                 deleteDayFromDB(date); // fire and forget
                 renderAll();
                 renderHistory();
+            }
+
+            function deleteCTDay(date) {
+                if (!confirm(`Delete cycle time data for ${date}?`)) return;
+                ctDays = ctDays.filter((d) => d.date !== date);
+                // Evict from cache so loadCTData() will re-fetch if needed.
+                ctCache.delete(date);
+                // Remove from metadata list so date pickers no longer include it.
+                availableCTDates = availableCTDates.filter((d) => d !== date);
+                deleteCTDayFromDB(date); // fire and forget
+                renderHistory();
+            }
+
+            // Deletes a ctDays parent doc and all its employees subcollection docs.
+            // Firestore does NOT cascade-delete subcollections, so we must fetch
+            // and delete the employee docs explicitly before deleting the parent.
+            async function deleteCTDayFromDB(date) {
+                if (!currentUser) return;
+                try {
+                    const empSnap = await db
+                        .collection("ctDays")
+                        .doc(date)
+                        .collection("employees")
+                        .get();
+                    const batch = db.batch();
+                    for (const empDoc of empSnap.docs) {
+                        batch.delete(empDoc.ref);
+                    }
+                    batch.delete(db.collection("ctDays").doc(date));
+                    await batch.commit();
+                } catch (e) {
+                    console.error("[MeetOPS] deleteCTDayFromDB error:", e);
+                }
             }
 
             // ══════════════════════════════════════════
