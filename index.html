@@ -3545,6 +3545,11 @@
             const perfCache = new Set(); // dates already loaded into allDays
             const ctCache = new Set(); // dates already loaded into ctDays
 
+            // Rows for the prior 7-day window, fetched directly from Firestore
+            // alongside loadData() so that KPI comparisons are always reliable
+            // regardless of which dates are already in perfCache / allDays.
+            let priorWeekRows = [];
+
             // Lightweight metadata — just date strings, no row data
             // Used to set date picker min/max without loading all data
             let availablePerfDates = []; // all dates that exist in performanceDays collection
@@ -3579,6 +3584,54 @@
                     allDays.sort((a, b) => a.date.localeCompare(b.date));
                 } catch (e) {
                     console.error("loadData error:", e);
+                }
+            }
+
+            // Fetches the prior-week window (current range shifted back 7 days)
+            // directly from Firestore and applies the same location / role filters
+            // as the main view. Stored in priorWeekRows so getPriorWeekRows() never
+            // has to rely on allDays containing those older dates.
+            async function loadPriorWeekData() {
+                if (!currentUser) return;
+                const fromStr = document.getElementById("date-from").value;
+                const toStr   = document.getElementById("date-to").value;
+                if (!fromStr || !toStr) return;
+
+                const shiftBack7 = (dateStr) => {
+                    const [y, mo, d] = dateStr.split("-").map(Number);
+                    const dt = new Date(y, mo - 1, d);
+                    dt.setDate(dt.getDate() - 7);
+                    return dt.toLocaleDateString("sv");
+                };
+
+                const priorFrom = shiftBack7(fromStr);
+                const priorTo   = shiftBack7(toStr);
+
+                try {
+                    const snap = await db
+                        .collection("performanceDays")
+                        .where("date", ">=", priorFrom)
+                        .where("date", "<=", priorTo)
+                        .orderBy("date")
+                        .get();
+
+                    let rows = snap.docs.flatMap(doc => doc.data().rows || []);
+
+                    // Apply location filter
+                    const loc = document.getElementById("location-filter").value;
+                    if (loc !== "all") rows = rows.filter(r => r.LOCATION === loc);
+
+                    // Apply manager filter
+                    if (currentUserRole === "manager") {
+                        rows = currentUserSupervisor
+                            ? rows.filter(r => r["SUPERVISOR"] === currentUserSupervisor)
+                            : [];
+                    }
+
+                    priorWeekRows = rows;
+                } catch (e) {
+                    console.error("loadPriorWeekData error:", e);
+                    priorWeekRows = [];
                 }
             }
 
@@ -3951,23 +4004,11 @@
                 return { from: prior.from, to: prior.to };
             }
 
-            // Returns the filtered row set for the week prior to toDateStr.
-            // Applies the same location and manager-role filters as the main view.
-            function getPriorWeekRows(toDateStr) {
-                const { prior } = getWeekBounds(toDateStr);
-                const days = allDays.filter(d => d.date >= prior.from && d.date <= prior.to);
-                if (!days.length) return [];
-
-                let rows = days.flatMap(d => d.rows);
-                const loc = document.getElementById("location-filter").value;
-                if (loc !== "all") rows = rows.filter(r => r.LOCATION === loc);
-
-                if (currentUserRole === "manager") {
-                    rows = currentUserSupervisor
-                        ? rows.filter(r => r["SUPERVISOR"] === currentUserSupervisor)
-                        : [];
-                }
-                return rows;
+            // Returns rows for the prior 7-day window (current range shifted back).
+            // Filtering and fetching are done in loadPriorWeekData(); this function
+            // is intentionally kept synchronous so renderKPIs() needs no change.
+            function getPriorWeekRows() {
+                return priorWeekRows;
             }
 
             function updateDateRange() {
@@ -4619,10 +4660,8 @@
             }
 
             function renderKPIs(rows) {
-                // Compare current view against the full prior calendar week
-                // (Mon–Sun before the week containing the "date-to" picker value).
-                const toDateStr = document.getElementById("date-to").value;
-                const prevRows = toDateStr ? getPriorWeekRows(toDateStr) : [];
+                // Compare current view against the same date range shifted back 7 days.
+                const prevRows = getPriorWeekRows();
 
                 const metrics = [
                     { label: "Avg PPH",        key: "PPH",            format: v => v.toFixed(1),           color: "cyan",   icon: "▲", goodUp: true  },
@@ -7667,8 +7706,8 @@
                 // Apply full-history bounds to pickers immediately
                 updateDateRange();
 
-                // Step 3: Load only the performance data for the current date window
-                await loadData();
+                // Step 3: Load the current date window and prior-week window in parallel
+                await Promise.all([loadData(), loadPriorWeekData()]);
 
                 // Step 3b: Re-resolve user role now that allDays is populated.
                 // The Step 1 call above runs with empty allDays (no data yet), so
@@ -7697,12 +7736,12 @@
                 }
             }
 
-            // Called when user changes date range — fetch any newly needed data
+            // Called when user changes date range — fetch current and prior-week data
             async function fetchDataForDateRange() {
                 const from = document.getElementById("date-from").value;
                 const to = document.getElementById("date-to").value;
                 if (!from || !to) return;
-                await loadData(); // loadData already scopes to the selected date range
+                await Promise.all([loadData(), loadPriorWeekData()]);
                 const page = getActivePage();
                 if (page === "cycletime") {
                     await loadCTData(from, to);
