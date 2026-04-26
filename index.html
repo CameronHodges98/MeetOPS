@@ -3731,7 +3731,10 @@
                         // Update header display
                         const nameEl = document.getElementById("user-display-name");
                         const roleEl = document.getElementById("user-display-role");
-                        if (nameEl) nameEl.textContent = currentCTName;
+                        if (nameEl) {
+                            const first = firstNameFromEmail(currentUser.email);
+                            nameEl.textContent = first.charAt(0).toUpperCase() + first.slice(1);
+                        }
                         if (roleEl) roleEl.textContent = "certified trainer";
                         // Hide all nav items except coaching
                         document.querySelectorAll(".nav-item").forEach(n => {
@@ -3776,23 +3779,16 @@
                 const nameEl = document.getElementById("user-display-name");
                 const roleEl = document.getElementById("user-display-role");
                 if (nameEl && roleEl) {
-                    if (currentUserRole === "admin") {
-                        nameEl.textContent = "Admin";
-                        roleEl.textContent = currentUser.email;
-                    } else if (currentUserRole === "general_manager") {
-                        nameEl.textContent = currentUser.email.split("@")[0];
-                        roleEl.textContent = "General Manager";
-                    } else if (currentUserRole === "ops_manager") {
-                        nameEl.textContent = currentUser.email.split("@")[0];
-                        roleEl.textContent = "Ops Manager";
-                    } else if (currentUserRole === "area_manager") {
-                        nameEl.textContent = currentUser.email.split("@")[0];
-                        roleEl.textContent = "Area Manager";
-                    } else {
-                        const fallbackName = currentUser.email.split("@")[0];
-                        nameEl.textContent = currentUserSupervisor || fallbackName;
-                        roleEl.textContent = "manager";
-                    }
+                    const first = firstNameFromEmail(currentUser.email);
+                    nameEl.textContent = first.charAt(0).toUpperCase() + first.slice(1);
+                    const roleLabel = {
+                        admin:           "admin",
+                        general_manager: "General Manager",
+                        ops_manager:     "Ops Manager",
+                        area_manager:    "Area Manager",
+                        manager:         "manager",
+                    };
+                    roleEl.textContent = roleLabel[currentUserRole] || currentUserRole;
                 }
 
                 // Upload buttons — admin and GM only; OM and AM do not upload
