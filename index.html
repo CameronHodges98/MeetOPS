@@ -5086,10 +5086,14 @@
                             console.error("Upload save error:", e);
                             closeUpload();
                             const badge = document.getElementById("record-count");
-                            badge.textContent = "Upload failed — check your admin permissions";
+                            badge.textContent = "Upload failed — check permissions";
                             badge.style.background = "var(--accent-red-dim)";
                             badge.style.color = "var(--accent-red)";
-                            setTimeout(() => { badge.style.background = ""; badge.style.color = ""; }, 4000);
+                            setTimeout(() => {
+                                badge.style.background = "";
+                                badge.style.color = "";
+                                badge.textContent = `${getFilteredRows().length} records`;
+                            }, 4000);
                             return;
                         }
                     }
