@@ -3697,10 +3697,30 @@
                     // Check for elevated org role (ops_manager / general_manager) before CT/manager fallback
                     const orgRoleDoc = await db.collection("roles").doc(currentUser.uid).get();
                     const orgRole = orgRoleDoc.exists ? orgRoleDoc.data().role : null;
-                    if (orgRole === "ops_manager" || orgRole === "general_manager" || orgRole === "area_manager") {
+                    if (orgRole === "ops_manager" || orgRole === "general_manager") {
+                        // Full org access — no supervisor filter
                         currentUserRole = orgRole;
                         currentUserSupervisor = null;
                         clearManagerMatchWarning();
+                        // Fall through to shared UI updates below
+                    } else if (orgRole === "area_manager") {
+                        // Area manager: elevated label but scoped to own supervisor like a regular manager
+                        currentUserRole = "area_manager";
+                        const amResult = matchSupervisorFromEmail(currentUser.email);
+                        currentUserSupervisor = amResult.name;
+                        if (amResult.status === "ok" || amResult.status === "no_data") {
+                            clearManagerMatchWarning();
+                        } else if (amResult.status === "no_match") {
+                            showManagerMatchWarning(
+                                `Your account (<strong>${currentUser.email}</strong>) could not be matched to a supervisor in the loaded data. ` +
+                                `Make sure your email first name matches the SUPERVISOR field in the CSV, ` +
+                                `or ask an admin to verify the data.`);
+                        } else if (amResult.status === "ambiguous") {
+                            showManagerMatchWarning(
+                                `Your account (<strong>${currentUser.email}</strong>) matched multiple supervisors: ` +
+                                `<strong>${amResult.candidates.join(", ")}</strong>. ` +
+                                `Contact an admin to resolve the duplicate first names in the data.`);
+                        }
                         // Fall through to shared UI updates below
                     } else {
                     // Check CT role before falling through to manager
@@ -3781,11 +3801,11 @@
                     uploadBtns.style.display =
                         (currentUserRole === "admin" || currentUserRole === "general_manager") ? "block" : "none";
 
-                // Location filter — visible for admin, GM, and OM; hidden for manager
+                // Location filter — visible for admin, GM, and OM; hidden for manager and AM
                 const locFilter = document.getElementById("location-filter");
                 if (locFilter)
                     locFilter.style.display =
-                        currentUserRole === "manager" ? "none" : "";
+                        (currentUserRole === "manager" || currentUserRole === "area_manager") ? "none" : "";
 
                 // History tab — admin and GM only
                 const historyNavItem = document.querySelector('[data-label="Data History"]');
@@ -3832,7 +3852,7 @@
             function updateManagerFilter() {
                 const sel = document.getElementById("manager-filter");
                 if (!sel) return;
-                const isOrgRole = currentUserRole === "ops_manager" || currentUserRole === "general_manager" || currentUserRole === "area_manager";
+                const isOrgRole = currentUserRole === "ops_manager" || currentUserRole === "general_manager";
                 sel.style.display = isOrgRole ? "" : "none";
                 if (!isOrgRole) return;
                 const current = sel.value;
@@ -4262,8 +4282,8 @@
                     const loc = document.getElementById("location-filter").value;
                     if (loc !== "all") rows = rows.filter(r => r.LOCATION === loc);
 
-                    // Apply manager filter
-                    if (currentUserRole === "manager") {
+                    // Apply manager filter (area_manager is also supervisor-scoped)
+                    if (currentUserRole === "manager" || currentUserRole === "area_manager") {
                         rows = currentUserSupervisor
                             ? rows.filter(r => r["SUPERVISOR"] === currentUserSupervisor)
                             : [];
@@ -4711,12 +4731,12 @@
                     rows = rows.filter((r) => r.LOCATION === loc);
 
                 // Org roles: filter by selected manager when one is chosen
-                if ((currentUserRole === "ops_manager" || currentUserRole === "general_manager" || currentUserRole === "area_manager") && selectedManagerFilter !== "all") {
+                if ((currentUserRole === "ops_manager" || currentUserRole === "general_manager") && selectedManagerFilter !== "all") {
                     rows = rows.filter(r => r["SUPERVISOR"] === selectedManagerFilter);
                 }
 
-                // Scope to manager's own employees when not admin
-                if (currentUserRole === "manager") {
+                // Scope to manager's own employees — includes area_manager (supervisor-scoped)
+                if (currentUserRole === "manager" || currentUserRole === "area_manager") {
                     // Re-attempt match if data loaded after initial resolve
                     if (!currentUserSupervisor && currentUser) {
                         const result = matchSupervisorFromEmail(currentUser.email);
@@ -4836,7 +4856,7 @@
                 const toEl = document.getElementById("date-to");
 
                 if (!fromEl.value && !toEl.value) {
-                    if (currentUserRole === "manager") {
+                    if (currentUserRole === "manager" || currentUserRole === "area_manager") {
                         const { from, to } = getPriorWeekRange();
                         setDateRange(from, to);
                     } else {
@@ -4863,7 +4883,7 @@
                 ].sort();
                 if (!allDates.length) return;
 
-                if (currentUserRole === "manager") {
+                if (currentUserRole === "manager" || currentUserRole === "area_manager") {
                     const { from, to } = getPriorWeekRange();
                     setDateRange(from, to);
                 } else {
@@ -4898,7 +4918,7 @@
                 ].sort();
                 if (!allDates.length) return;
 
-                if (currentUserRole === "manager") {
+                if (currentUserRole === "manager" || currentUserRole === "area_manager") {
                     const { from, to } = getPriorWeekRange();
                     setDateRange(from, to);
                 } else {
@@ -5560,9 +5580,9 @@
                     let rows = day.rows;
                     const loc = document.getElementById("location-filter").value;
                     if (loc !== "all") rows = rows.filter(r => r.LOCATION === loc);
-                    if (currentUserRole === "manager" && currentUserSupervisor) {
+                    if ((currentUserRole === "manager" || currentUserRole === "area_manager") && currentUserSupervisor) {
                         rows = rows.filter(r => r["SUPERVISOR"] === currentUserSupervisor);
-                    } else if ((currentUserRole === "ops_manager" || currentUserRole === "general_manager" || currentUserRole === "area_manager") && selectedManagerFilter !== "all") {
+                    } else if ((currentUserRole === "ops_manager" || currentUserRole === "general_manager") && selectedManagerFilter !== "all") {
                         rows = rows.filter(r => r["SUPERVISOR"] === selectedManagerFilter);
                     }
 
@@ -6936,8 +6956,8 @@
                     startManagerCoachingListener(); // first snapshot now sees populated availableCTs
                 }
 
-                // Manager role: skip selection screen, go straight to their own view
-                if (currentUserRole === "manager") {
+                // Manager / Area Manager: skip selection screen, go straight to their own view
+                if (currentUserRole === "manager" || currentUserRole === "area_manager") {
                     // Try re-matching in case data loaded after initial resolve
                     if (!currentUserSupervisor && currentUser) {
                         const result = matchSupervisorFromEmail(currentUser.email);
@@ -8970,11 +8990,11 @@
                 await fetchAvailableDates();
 
                 // Step 2: Set default date values AND apply min/max bounds from full available history
-                if (currentUserRole === "manager") {
+                if (currentUserRole === "manager" || currentUserRole === "area_manager") {
                     const { from, to } = getPriorWeekRange();
                     setDateRange(from, to);
                 } else {
-                    // Admin: default to Monday of the latest uploaded week through the latest date
+                    // Admin/OM/GM: default to Monday of the latest uploaded week through the latest date
                     const latest = availablePerfDates.length
                         ? availablePerfDates[availablePerfDates.length - 1]
                         : new Date().toLocaleDateString("sv");
