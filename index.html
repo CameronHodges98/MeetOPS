@@ -1894,6 +1894,7 @@
                         border-radius: var(--radius);
                         display: block;
                     "
+                    onkeydown="if (event.key === 'Enter') document.getElementById('login-password').focus();"
                 />
                 <input
                     id="login-password"
@@ -1904,12 +1905,18 @@
                         width: 100%;
                         padding: 10px 14px;
                         font-size: 14px;
-                        margin-bottom: 20px;
+                        margin-bottom: 6px;
                         border-radius: var(--radius);
                         display: block;
                     "
                     onkeydown="if (event.key === 'Enter') handleLogin();"
                 />
+                <div style="text-align:right; margin-bottom:16px;">
+                    <span onclick="showForgotPassword()"
+                          style="font-size:12px; color:var(--accent-cyan); cursor:pointer;">
+                        Forgot password?
+                    </span>
+                </div>
                 <button
                     onclick="handleLogin()"
                     id="login-btn"
@@ -1934,6 +1941,24 @@
                 >
                     Signing in...
                 </div>
+            </div>
+
+            <!-- Forgot password panel — shown in place of the sign-in form -->
+            <div id="forgot-password-panel" style="display:none; width:380px; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-lg); padding:32px; text-align:center;">
+                <div style="font-size:18px; font-weight:700; color:var(--text-primary); margin-bottom:8px;">Reset Password</div>
+                <div style="font-size:13px; color:var(--text-muted); margin-bottom:20px;">Enter your email and we'll send a reset link.</div>
+                <div id="forgot-error" style="display:none; background:var(--accent-red-dim); color:var(--accent-red); border:1px solid rgba(248,81,73,0.2); border-radius:var(--radius); padding:10px 14px; font-size:12.5px; margin-bottom:16px; text-align:left;"></div>
+                <div id="forgot-success" style="display:none; background:var(--accent-green-dim); color:var(--accent-green); border:1px solid rgba(63,185,80,0.2); border-radius:var(--radius); padding:10px 14px; font-size:12.5px; margin-bottom:16px; text-align:left;"></div>
+                <input id="forgot-email" type="email" placeholder="Email address" class="filter-select"
+                       style="width:100%; padding:10px 14px; font-size:14px; margin-bottom:14px; border-radius:var(--radius); display:block;"
+                       onkeydown="if (event.key === 'Enter') handleForgotPassword();" />
+                <button onclick="handleForgotPassword()" id="forgot-btn" class="btn-primary"
+                        style="width:100%; padding:11px; font-size:14px; border-radius:var(--radius); margin-bottom:10px;">
+                    Send Reset Link
+                </button>
+                <span onclick="showLoginForm()" style="font-size:12px; color:var(--accent-cyan); cursor:pointer;">
+                    ← Back to Sign In
+                </span>
             </div>
         </div>
 
@@ -3711,24 +3736,109 @@
                         currentUserRole === "admin" ? "" : "none";
             }
 
-            async function handleLogin() {
-                const email = document
-                    .getElementById("login-email")
-                    .value.trim();
-                const pass = document.getElementById("login-password").value;
-                const errEl = document.getElementById("login-error");
-                const btn = document.getElementById("login-btn");
+            // Maps Firebase auth error codes to plain-English messages.
+            function friendlyAuthError(code) {
+                const map = {
+                    "auth/invalid-email":          "Please enter a valid email address.",
+                    "auth/user-not-found":          "No account found with that email address.",
+                    "auth/wrong-password":          "Incorrect password. Please try again.",
+                    "auth/invalid-credential":      "Incorrect email or password. Please try again.",
+                    "auth/too-many-requests":       "Too many failed attempts. Please wait a few minutes and try again.",
+                    "auth/user-disabled":           "This account has been disabled. Contact your administrator.",
+                    "auth/network-request-failed":  "Network error. Check your connection and try again.",
+                };
+                return map[code] || "Sign in failed. Please try again.";
+            }
+
+            function resetLoginForm() {
+                const btn  = document.getElementById("login-btn");
                 const load = document.getElementById("login-loading");
+                if (btn)  { btn.style.display = "block"; btn.disabled = false; }
+                if (load)  load.style.display = "none";
+            }
+
+            function hideAuthGate() {
+                const gate = document.getElementById("auth-gate");
+                if (!gate) return;
+                gate.style.opacity = "0";
+                setTimeout(() => { gate.style.display = "none"; }, 200);
+            }
+
+            async function handleLogin() {
+                const email = document.getElementById("login-email").value.trim();
+                const pass  = document.getElementById("login-password").value;
+                const errEl = document.getElementById("login-error");
+                const btn   = document.getElementById("login-btn");
+                const load  = document.getElementById("login-loading");
+
                 errEl.style.display = "none";
-                btn.style.display = "none";
+
+                // Client-side validation before hitting Firebase
+                if (!email || !pass) {
+                    errEl.textContent = "Please enter your email and password.";
+                    errEl.style.display = "block";
+                    return;
+                }
+
+                btn.style.display  = "none";
+                btn.disabled       = true;
                 load.style.display = "block";
+
+                // Safety net: if Firebase never resolves (network hang), restore the form
+                const timeout = setTimeout(resetLoginForm, 15000);
+
                 try {
                     await auth.signInWithEmailAndPassword(email, pass);
+                    clearTimeout(timeout);
                 } catch (e) {
-                    errEl.textContent = e.message;
+                    clearTimeout(timeout);
+                    errEl.textContent  = friendlyAuthError(e.code);
                     errEl.style.display = "block";
-                    btn.style.display = "block";
-                    load.style.display = "none";
+                    resetLoginForm();
+                }
+            }
+
+            function showForgotPassword() {
+                document.getElementById("login-screen").querySelector("div").style.display = "none";
+                document.getElementById("forgot-password-panel").style.display = "block";
+                document.getElementById("forgot-email").value = document.getElementById("login-email").value;
+                document.getElementById("forgot-error").style.display   = "none";
+                document.getElementById("forgot-success").style.display = "none";
+            }
+
+            function showLoginForm() {
+                document.getElementById("forgot-password-panel").style.display = "none";
+                document.getElementById("login-screen").querySelector("div").style.display = "block";
+            }
+
+            async function handleForgotPassword() {
+                const email  = document.getElementById("forgot-email").value.trim();
+                const errEl  = document.getElementById("forgot-error");
+                const succEl = document.getElementById("forgot-success");
+                const btn    = document.getElementById("forgot-btn");
+
+                errEl.style.display  = "none";
+                succEl.style.display = "none";
+
+                if (!email) {
+                    errEl.textContent    = "Please enter your email address.";
+                    errEl.style.display  = "block";
+                    return;
+                }
+
+                btn.disabled    = true;
+                btn.textContent = "Sending…";
+
+                try {
+                    await auth.sendPasswordResetEmail(email);
+                    succEl.textContent    = `Reset link sent to ${email}. Check your inbox (and spam folder).`;
+                    succEl.style.display  = "block";
+                    btn.textContent       = "Sent!";
+                } catch (e) {
+                    errEl.textContent   = friendlyAuthError(e.code);
+                    errEl.style.display = "block";
+                    btn.disabled        = false;
+                    btn.textContent     = "Send Reset Link";
                 }
             }
 
@@ -3840,19 +3950,19 @@
                             try {
                                 const inviteDoc = await db.collection("invites").doc(inviteToken).get();
                                 if (inviteDoc.exists && !inviteDoc.data().used) {
-                                    document.getElementById("auth-gate").style.display = "none";
+                                    hideAuthGate();
                                     showCTSignupScreen(inviteDoc.data(), inviteToken);
                                 } else {
-                                    document.getElementById("auth-gate").style.display = "none";
+                                    hideAuthGate();
                                     document.getElementById("ct-invalid-invite-screen").style.display = "flex";
                                 }
                             } catch (e) {
                                 // Firestore error — fall back to normal login
-                                document.getElementById("auth-gate").style.display = "none";
+                                hideAuthGate();
                                 document.getElementById("login-screen").style.display = "flex";
                             }
                         } else {
-                            document.getElementById("auth-gate").style.display = "none";
+                            hideAuthGate();
                             document.getElementById("login-screen").style.display = "flex";
                         }
                     }
@@ -8661,7 +8771,7 @@
                     if (coachingPage) coachingPage.classList.add("active");
                     document.getElementById("page-title").textContent = "Coaching";
                     renderCTCoachingPage();
-                    document.getElementById("auth-gate").style.display = "none";
+                    hideAuthGate();
                     return; // skip all data loading — CTs don't need performance data
                 }
 
@@ -8714,7 +8824,7 @@
                 }
 
                 // Auth gate: role resolved, data loaded, UI ready — reveal the app
-                document.getElementById("auth-gate").style.display = "none";
+                hideAuthGate();
             }
 
             // Called when user changes date range — fetch current and prior-week data
