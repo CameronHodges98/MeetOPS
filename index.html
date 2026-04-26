@@ -6416,11 +6416,13 @@
                     }
                 } catch (e) {
                     console.error("assignCT error:", e);
+                    alert("Failed to assign CT. Please try again.");
                 }
             }
 
             // Remove CT assignment from a coaching doc.
             async function unassignCT(coachingId) {
+                if (!confirm("Remove this CT assignment?")) return;
                 try {
                     await db.collection("coachings").doc(coachingId).update({
                         ctId: null,
@@ -6430,6 +6432,7 @@
                     });
                 } catch (e) {
                     console.error("unassignCT error:", e);
+                    alert("Failed to unassign CT. Please try again.");
                 }
             }
 
@@ -6599,18 +6602,11 @@
                         revokedBy: currentUser.uid
                     });
 
-                    // 3. Batch-unassign all coachings for this CT so they appear unassigned
+                    // 3. Delete all coaching docs for this CT — full removal, not just unassign
                     const coachingSnap = await db.collection("coachings").where("ctId", "==", ctId).get();
                     if (!coachingSnap.empty) {
                         const batch = db.batch();
-                        for (const doc of coachingSnap.docs) {
-                            batch.update(doc.ref, {
-                                ctId: null,
-                                ctName: null,
-                                status: "unassigned",
-                                assignedAt: null
-                            });
-                        }
+                        for (const doc of coachingSnap.docs) batch.delete(doc.ref);
                         await batch.commit();
                     }
 
@@ -6625,7 +6621,7 @@
                 }
             }
 
-            function renderManagers() {
+            async function renderManagers() {
                 const hasData = allDays.length > 0;
                 document.getElementById("managers-empty").style.display =
                     hasData ? "none" : "block";
@@ -6633,10 +6629,11 @@
                     hasData ? "block" : "none";
                 if (!hasData) return;
 
-                // Start Firestore listeners and load CT list for manager coaching features
+                // Load CTs first — must be awaited so availableCTs is populated before the
+                // coaching panel and the onSnapshot listener render their CT dropdowns/sections.
                 if (currentUserRole === "manager" || currentUserRole === "admin") {
-                    startManagerCoachingListener();
-                    loadAvailableCTs();
+                    await loadAvailableCTs();
+                    startManagerCoachingListener(); // first snapshot now sees populated availableCTs
                 }
 
                 // Manager role: skip selection screen, go straight to their own view
@@ -8637,11 +8634,14 @@
                 // This fires before any role check so revoked CTs cannot access any data.
                 const revokedDoc = await db.collection("revokedUsers").doc(currentUser.uid).get();
                 if (revokedDoc.exists) {
-                    // Attempt to delete the Firebase Auth account. The client SDK allows a user
-                    // to delete their own account; this works when the session is recent (login
-                    // or refresh). Silently skip if the session is too old — the signOut() below
-                    // still blocks access via the revokedUsers gate on every future load.
-                    try { await currentUser.delete(); } catch (_) {}
+                    // Attempt to delete the Firebase Auth account. Works when session is recent.
+                    // If deletion succeeds, also clean up the revokedUsers gate doc — the account
+                    // is fully gone so the doc is now orphaned. If deletion fails (old session),
+                    // leave revokedUsers in place so the gate continues blocking future logins.
+                    try {
+                        await currentUser.delete();
+                        await db.collection("revokedUsers").doc(currentUser.uid).delete();
+                    } catch (_) {}
                     await auth.signOut();
                     return;
                 }
