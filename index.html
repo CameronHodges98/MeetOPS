@@ -5074,22 +5074,39 @@
                     for (let i = 0; i < newDays.length; i += CHUNK) {
                         const batch = db.batch();
                         for (const day of newDays.slice(i, i + CHUNK)) {
-                            const ref = db
-                                .collection("performanceDays")
-                                .doc(day.date);
-                            batch.set(ref, {
+                            batch.set(db.collection("performanceDays").doc(day.date), {
                                 date: day.date,
                                 filename: day.filename || "",
                                 rows: day.rows,
                             });
                         }
-                        batch
-                            .commit()
-                            .catch((e) =>
-                                console.error("Upload save error:", e),
-                            );
+                        try {
+                            await batch.commit();
+                        } catch (e) {
+                            console.error("Upload save error:", e);
+                            closeUpload();
+                            const badge = document.getElementById("record-count");
+                            badge.textContent = "Upload failed — check your admin permissions";
+                            badge.style.background = "var(--accent-red-dim)";
+                            badge.style.color = "var(--accent-red)";
+                            setTimeout(() => { badge.style.background = ""; badge.style.color = ""; }, 4000);
+                            return;
+                        }
                     }
                 }
+
+                // Refresh availablePerfDates with the newly uploaded dates so the picker
+                // bounds and default range reflect the new data immediately.
+                for (const day of newDays) {
+                    if (!availablePerfDates.includes(day.date)) availablePerfDates.push(day.date);
+                }
+                availablePerfDates.sort();
+
+                // Advance picker to the week containing the most recently uploaded date
+                const latestNew = [...newDays].sort((a, b) => a.date.localeCompare(b.date)).pop().date;
+                const { current: newCurrent } = getWeekBounds(latestNew);
+                setDateRange(newCurrent.from, latestNew);
+                updateDateRange();
 
                 closeUpload();
                 renderAll();
@@ -7881,6 +7898,16 @@
                         }
                     }
                 }
+
+                // Refresh availableCTDates with newly uploaded dates so picker bounds update
+                for (const day of newCTDays) {
+                    if (!availableCTDates.includes(day.date)) availableCTDates.push(day.date);
+                }
+                availableCTDates.sort();
+
+                const latestCT = [...newCTDays].sort((a, b) => a.date.localeCompare(b.date)).pop().date;
+                const { current: ctCurrent } = getWeekBounds(latestCT);
+                setDateRange(ctCurrent.from, latestCT);
 
                 closeCTUpload();
                 updateDateRange();
