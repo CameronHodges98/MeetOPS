@@ -2129,6 +2129,23 @@
                     </svg>
                     <span>Data History</span>
                 </div>
+                <!-- User Roles nav — GM only; hidden by default -->
+                <div
+                    class="nav-item"
+                    data-label="User Roles"
+                    data-page="users"
+                    onclick="showPage('users', this)"
+                    style="display:none;"
+                >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                        <circle cx="9" cy="7" r="4"/>
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                        <line x1="18" y1="8" x2="23" y2="8"/>
+                        <line x1="20.5" y1="5.5" x2="20.5" y2="10.5"/>
+                    </svg>
+                    <span>User Roles</span>
+                </div>
                 <!-- Coaching nav — CT role only; hidden for admin/manager by default -->
                 <div
                     class="nav-item"
@@ -2207,6 +2224,14 @@
                         onchange="applyFilters()"
                     >
                         <option value="all">All Locations</option>
+                    </select>
+                    <select
+                        class="filter-select"
+                        id="manager-filter"
+                        onchange="applyManagerFilter()"
+                        style="display:none"
+                    >
+                        <option value="all">All Managers</option>
                     </select>
                     <div style="display: flex; align-items: center; gap: 6px">
                         <!-- Hidden value stores — all JS reads .value from these unchanged -->
@@ -3235,6 +3260,27 @@
                     </div>
                 </div>
 
+                <!-- USER ROLES PAGE — GM only -->
+                <div class="page" id="page-users">
+                    <div class="page-header" style="margin-bottom:1.5rem;">
+                        <div style="font-size:1.1rem; font-weight:600; color:var(--text-primary);">User Roles</div>
+                        <div style="font-size:0.85rem; color:var(--text-muted); margin-top:0.25rem;">Assign Operations Manager or General Manager access to users</div>
+                    </div>
+                    <div id="users-loading" style="color:var(--text-muted); font-size:0.9rem; padding:1rem 0;">Loading users…</div>
+                    <div id="users-table-wrap" style="display:none; overflow-x:auto;">
+                        <table style="width:100%; border-collapse:collapse; font-size:0.875rem;">
+                            <thead>
+                                <tr style="border-bottom:1px solid var(--border); color:var(--text-muted); text-align:left;">
+                                    <th style="padding:8px 12px; font-weight:500;">Email</th>
+                                    <th style="padding:8px 12px; font-weight:500;">Current Role</th>
+                                    <th style="padding:8px 12px; font-weight:500;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="users-table-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+
             </div>
         </div>
 
@@ -3498,8 +3544,9 @@
             const db = firebase.firestore();
 
             let currentUser = null;
-            let currentUserRole = "manager"; // 'admin' | 'manager' | 'ct'
-            let currentUserSupervisor = null; // matched full supervisor name from data, null = admin
+            let currentUserRole = "manager"; // 'admin' | 'general_manager' | 'ops_manager' | 'manager' | 'ct'
+            let currentUserSupervisor = null; // matched full supervisor name from data, null for admin/OM/GM
+            let selectedManagerFilter = "all"; // supervisor name or "all" — OM/GM manager filter dropdown
             let currentCTName = ""; // full name of CT user from certifiedTrainers doc
             // Tracks whether the user was ever signed in during this session.
             // Used in onAuthStateChanged to distinguish a sign-out transition
@@ -3647,6 +3694,15 @@
                     currentUserSupervisor = null;
                     clearManagerMatchWarning();
                 } else {
+                    // Check for elevated org role (ops_manager / general_manager) before CT/manager fallback
+                    const orgRoleDoc = await db.collection("roles").doc(currentUser.uid).get();
+                    const orgRole = orgRoleDoc.exists ? orgRoleDoc.data().role : null;
+                    if (orgRole === "ops_manager" || orgRole === "general_manager") {
+                        currentUserRole = orgRole;
+                        currentUserSupervisor = null;
+                        clearManagerMatchWarning();
+                        // Fall through to shared UI updates below
+                    } else {
                     // Check CT role before falling through to manager
                     const ctData = await checkCTRole(currentUser.uid);
                     if (ctData) {
@@ -3693,47 +3749,52 @@
                             `Contact an admin to resolve the duplicate first names in the data.`,
                         );
                     }
-                }
+                    } // closes inner else (CT / manager path)
+                }  // closes outer else (non-admin path)
 
                 // Update user identity display in the header.
-                // #user-display-name shows the person's full name (or email prefix as fallback).
-                // #user-display-role shows a small label ("admin" or "manager").
                 const nameEl = document.getElementById("user-display-name");
                 const roleEl = document.getElementById("user-display-role");
                 if (nameEl && roleEl) {
                     if (currentUserRole === "admin") {
-                        // Admins may not appear in supervisor data — show "Admin" as primary,
-                        // with their email as the sub-label so they still know which account.
                         nameEl.textContent = "Admin";
                         roleEl.textContent = currentUser.email;
+                    } else if (currentUserRole === "general_manager") {
+                        nameEl.textContent = currentUser.email.split("@")[0];
+                        roleEl.textContent = "General Manager";
+                    } else if (currentUserRole === "ops_manager") {
+                        nameEl.textContent = currentUser.email.split("@")[0];
+                        roleEl.textContent = "Ops Manager";
                     } else {
-                        // Managers: show full matched name (e.g. "Alana Sledge") if available,
-                        // otherwise fall back to the email prefix extracted from their address.
                         const fallbackName = currentUser.email.split("@")[0];
                         nameEl.textContent = currentUserSupervisor || fallbackName;
                         roleEl.textContent = "manager";
                     }
                 }
 
-                // Upload buttons — always visible for everyone
-                const uploadBtns = document.getElementById(
-                    "sidebar-upload-btns",
-                );
-                if (uploadBtns) uploadBtns.style.display = "block";
+                // Upload buttons — admin and GM only
+                const uploadBtns = document.getElementById("sidebar-upload-btns");
+                if (uploadBtns)
+                    uploadBtns.style.display =
+                        (currentUserRole === "admin" || currentUserRole === "general_manager") ? "block" : "none";
 
-                // Location filter select — hide just the select for managers, not the whole topbar
+                // Location filter — visible for admin, GM, and OM; hidden for manager
                 const locFilter = document.getElementById("location-filter");
                 if (locFilter)
                     locFilter.style.display =
-                        currentUserRole === "admin" ? "" : "none";
+                        currentUserRole === "manager" ? "none" : "";
 
-                // History tab — admin only
-                const historyNavItem = document.querySelector(
-                    '[data-label="Data History"]',
-                );
+                // History tab — admin and GM only
+                const historyNavItem = document.querySelector('[data-label="Data History"]');
                 if (historyNavItem)
                     historyNavItem.style.display =
-                        currentUserRole === "admin" ? "" : "none";
+                        (currentUserRole === "admin" || currentUserRole === "general_manager") ? "" : "none";
+
+                // User Roles tab — GM only
+                const usersNavItem = document.querySelector('[data-label="User Roles"]');
+                if (usersNavItem)
+                    usersNavItem.style.display =
+                        currentUserRole === "general_manager" ? "" : "none";
             }
 
             // Maps Firebase auth error codes to plain-English messages.
@@ -3762,6 +3823,113 @@
                 if (!gate) return;
                 gate.style.opacity = "0";
                 setTimeout(() => { gate.style.display = "none"; }, 200);
+            }
+
+            // ── Manager filter dropdown (OM / GM roles) ──────────────────────────────
+            function updateManagerFilter() {
+                const sel = document.getElementById("manager-filter");
+                if (!sel) return;
+                const isOrgRole = currentUserRole === "ops_manager" || currentUserRole === "general_manager";
+                sel.style.display = isOrgRole ? "" : "none";
+                if (!isOrgRole) return;
+                const current = sel.value;
+                const sups = [...new Set(allDays.flatMap(d => d.rows).map(r => r["SUPERVISOR"]).filter(Boolean))].sort();
+                sel.innerHTML = '<option value="all">All Managers</option>' +
+                    sups.map(s => `<option value="${s}">${s}</option>`).join("");
+                if (sups.includes(current)) sel.value = current;
+            }
+
+            function applyManagerFilter() {
+                selectedManagerFilter = document.getElementById("manager-filter").value;
+                applyFilters();
+            }
+
+            // ── Role management page (GM only) ────────────────────────────────────────
+            async function renderUsersPage() {
+                const loadingEl = document.getElementById("users-loading");
+                const tableWrap = document.getElementById("users-table-wrap");
+                const tbody = document.getElementById("users-table-body");
+                if (!loadingEl || !tableWrap || !tbody) return;
+                loadingEl.style.display = "block";
+                tableWrap.style.display = "none";
+
+                try {
+                    const [usersSnap, rolesSnap, adminsSnap] = await Promise.all([
+                        db.collection("users").get(),
+                        db.collection("roles").get(),
+                        db.collection("admins").get()
+                    ]);
+                    const roleMap = {};
+                    rolesSnap.forEach(d => { roleMap[d.id] = d.data().role; });
+                    const adminSet = new Set();
+                    adminsSnap.forEach(d => adminSet.add(d.id));
+
+                    const rolePill = (uid) => {
+                        if (adminSet.has(uid)) return `<span style="background:var(--accent-purple-dim,#3b2f5e);color:var(--accent-purple,#a78bfa);padding:2px 8px;border-radius:99px;font-size:0.75rem;">Admin</span>`;
+                        if (roleMap[uid] === "general_manager") return `<span style="background:var(--accent-amber-dim,#3d2f1a);color:var(--accent-amber,#f59e0b);padding:2px 8px;border-radius:99px;font-size:0.75rem;">General Manager</span>`;
+                        if (roleMap[uid] === "ops_manager") return `<span style="background:var(--accent-cyan-dim,#0e2f38);color:var(--accent-cyan,#22d3ee);padding:2px 8px;border-radius:99px;font-size:0.75rem;">Ops Manager</span>`;
+                        return `<span style="background:var(--bg-hover,#2a2a2a);color:var(--text-muted);padding:2px 8px;border-radius:99px;font-size:0.75rem;">Manager</span>`;
+                    };
+
+                    const actionBtns = (uid, email) => {
+                        if (adminSet.has(uid) || uid === currentUser.uid) return `<span style="color:var(--text-muted);font-size:0.8rem;">—</span>`;
+                        const safeEmail = email.replace(/'/g, "\\'");
+                        const omActive = roleMap[uid] === "ops_manager";
+                        const gmActive = roleMap[uid] === "general_manager";
+                        return `
+                            <button onclick="assignRole('${uid}','ops_manager')" ${omActive ? "disabled" : ""}
+                                style="padding:3px 10px;border-radius:6px;border:1px solid var(--border);background:${omActive?"var(--accent-cyan-dim,#0e2f38)":"var(--bg-card)"};color:${omActive?"var(--accent-cyan,#22d3ee)":"var(--text-muted)"};cursor:${omActive?"default":"pointer"};font-size:0.8rem;margin-right:4px;">
+                                Ops Manager
+                            </button>
+                            <button onclick="assignRole('${uid}','general_manager')" ${gmActive ? "disabled" : ""}
+                                style="padding:3px 10px;border-radius:6px;border:1px solid var(--border);background:${gmActive?"var(--accent-amber-dim,#3d2f1a)":"var(--bg-card)"};color:${gmActive?"var(--accent-amber,#f59e0b)":"var(--text-muted)"};cursor:${gmActive?"default":"pointer"};font-size:0.8rem;margin-right:4px;">
+                                General Manager
+                            </button>
+                            ${(omActive || gmActive) ? `<button onclick="removeRole('${uid}')" style="padding:3px 10px;border-radius:6px;border:1px solid var(--accent-red,#f87171);background:transparent;color:var(--accent-red,#f87171);cursor:pointer;font-size:0.8rem;">Remove</button>` : ""}
+                        `;
+                    };
+
+                    tbody.innerHTML = usersSnap.docs.map(d => {
+                        const uid = d.id;
+                        const { email } = d.data();
+                        return `<tr style="border-bottom:1px solid var(--border);">
+                            <td style="padding:10px 12px;color:var(--text-primary);">${email}</td>
+                            <td style="padding:10px 12px;">${rolePill(uid)}</td>
+                            <td style="padding:10px 12px;">${actionBtns(uid, email)}</td>
+                        </tr>`;
+                    }).join("") || `<tr><td colspan="3" style="padding:16px;color:var(--text-muted);text-align:center;">No users have logged in yet.</td></tr>`;
+
+                    loadingEl.style.display = "none";
+                    tableWrap.style.display = "block";
+                } catch (e) {
+                    loadingEl.textContent = "Failed to load users. Check your permissions.";
+                    console.error("renderUsersPage error:", e);
+                }
+            }
+
+            async function assignRole(uid, role) {
+                try {
+                    await db.collection("roles").doc(uid).set({
+                        role,
+                        assignedBy: currentUser.uid,
+                        assignedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    renderUsersPage();
+                } catch (e) {
+                    alert("Failed to assign role. Check your permissions.");
+                    console.error("assignRole error:", e);
+                }
+            }
+
+            async function removeRole(uid) {
+                if (!confirm("Remove this user's elevated role? They will revert to standard manager access on next login.")) return;
+                try {
+                    await db.collection("roles").doc(uid).delete();
+                    renderUsersPage();
+                } catch (e) {
+                    alert("Failed to remove role. Check your permissions.");
+                    console.error("removeRole error:", e);
+                }
             }
 
             async function handleLogin() {
@@ -4449,6 +4617,7 @@
                     history: "Data History",
                     cycletime: "Cycle Time",
                     coaching: "Coaching",
+                    users: "User Roles",
                 }[name];
                 document.getElementById("breadcrumb").textContent = "/ " + name;
                 if (name !== "employees") {
@@ -4474,6 +4643,7 @@
                     if (name === "managers") renderManagers();
                     if (name === "employees") renderEmployeeCards();
                     if (name === "history") renderHistory();
+                    if (name === "users") renderUsersPage();
                 }
             }
 
@@ -4528,6 +4698,11 @@
                 let rows = days.flatMap((d) => d.rows);
                 if (loc !== "all")
                     rows = rows.filter((r) => r.LOCATION === loc);
+
+                // Org roles: filter by selected manager when one is chosen
+                if ((currentUserRole === "ops_manager" || currentUserRole === "general_manager") && selectedManagerFilter !== "all") {
+                    rows = rows.filter(r => r["SUPERVISOR"] === selectedManagerFilter);
+                }
 
                 // Scope to manager's own employees when not admin
                 if (currentUserRole === "manager") {
@@ -5244,6 +5419,7 @@
             function renderAll() {
                 const hasData = allDays.length > 0;
                 updateLocationFilter();
+                updateManagerFilter();
                 const rows = getFilteredRows();
                 document.getElementById("record-count").textContent =
                     `${rows.length} records`;
@@ -5375,6 +5551,8 @@
                     if (loc !== "all") rows = rows.filter(r => r.LOCATION === loc);
                     if (currentUserRole === "manager" && currentUserSupervisor) {
                         rows = rows.filter(r => r["SUPERVISOR"] === currentUserSupervisor);
+                    } else if ((currentUserRole === "ops_manager" || currentUserRole === "general_manager") && selectedManagerFilter !== "all") {
+                        rows = rows.filter(r => r["SUPERVISOR"] === selectedManagerFilter);
                     }
 
                     weekMap.get(key).rows.push(...rows);
@@ -6741,7 +6919,8 @@
 
                 // Load CTs first — must be awaited so availableCTs is populated before the
                 // coaching panel and the onSnapshot listener render their CT dropdowns/sections.
-                if (currentUserRole === "manager" || currentUserRole === "admin") {
+                if (currentUserRole === "manager" || currentUserRole === "admin" ||
+                    currentUserRole === "ops_manager" || currentUserRole === "general_manager") {
                     await loadAvailableCTs();
                     startManagerCoachingListener(); // first snapshot now sees populated availableCTs
                 }
@@ -8804,6 +8983,12 @@
                 // re-run it so managers see their matched full supervisor name (e.g. "Alana Sledge").
                 await resolveUserRole();
 
+                // Register in user registry so the GM role management page can list all users
+                db.collection("users").doc(currentUser.uid).set({
+                    email: currentUser.email,
+                    lastLogin: firebase.firestore.FieldValue.serverTimestamp()
+                }, { merge: true }).catch(() => {});
+
                 // Step 4: Update location filter and render immediately with what we have
                 updateLocationFilter();
                 renderAll();
@@ -8814,6 +8999,7 @@
                 if (page === "employees") renderEmployeeCards();
                 if (page === "trends") renderTrends();
                 if (page === "history") renderHistory();
+                if (page === "users") renderUsersPage();
 
                 // Step 6: Load CT data lazily only if on cycle time tab, else defer to tab navigation
                 if (page === "cycletime") {
