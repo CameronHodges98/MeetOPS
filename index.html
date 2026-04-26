@@ -1984,6 +1984,26 @@
           </div>
         </div>
 
+        <!-- MANAGER SIGNUP SCREEN — shown when a valid ?invite=<token>&type=manager URL param is present -->
+        <div id="mgr-signup-screen" style="display:none; position:fixed; inset:0; z-index:1000; background:var(--bg-base); align-items:center; justify-content:center;">
+          <div style="width:100%; max-width:380px; padding:2rem;">
+            <div style="text-align:center; margin-bottom:2rem;">
+              <div style="font-size:1.5rem; font-weight:700; color:var(--text-primary);">Create Manager Account</div>
+              <div style="font-size:0.85rem; color:var(--text-muted); margin-top:0.5rem;">You've been invited to MeetOPS</div>
+            </div>
+            <div id="mgr-signup-error" style="display:none; background:var(--accent-red-dim); color:var(--accent-red); border:1px solid var(--accent-red); border-radius:6px; padding:0.75rem; margin-bottom:1rem; font-size:0.875rem;"></div>
+            <input id="mgr-signup-email" type="email" placeholder="Email" autocomplete="email" readonly
+              style="width:100%; padding:0.75rem; margin-bottom:0.75rem; background:var(--bg-hover); border:1px solid var(--border); border-radius:6px; color:var(--text-muted); font-size:0.95rem; box-sizing:border-box; cursor:default;" />
+            <input id="mgr-signup-password" type="password" placeholder="Choose a password (min 6 characters)" autocomplete="new-password"
+              style="width:100%; padding:0.75rem; margin-bottom:1.25rem; background:var(--bg-card); border:1px solid var(--border); border-radius:6px; color:var(--text-primary); font-size:0.95rem; box-sizing:border-box;" />
+            <button id="mgr-signup-btn" onclick="handleManagerSignup()"
+              style="width:100%; padding:0.75rem; background:var(--accent-green,#4ade80); color:#0d1117; border:none; border-radius:6px; font-weight:600; font-size:0.95rem; cursor:pointer;">
+              Create Account
+            </button>
+            <div id="mgr-signup-loading" style="display:none; text-align:center; color:var(--text-muted); margin-top:1rem; font-size:0.875rem;">Creating account…</div>
+          </div>
+        </div>
+
         <!-- CT INVALID INVITE SCREEN — shown when invite token is missing or already used -->
         <div id="ct-invalid-invite-screen" style="display:none; position:fixed; inset:0; z-index:1000; background:var(--bg-base); align-items:center; justify-content:center;">
           <div style="text-align:center; padding:2rem;">
@@ -3262,9 +3282,12 @@
 
                 <!-- USER ROLES PAGE — GM only -->
                 <div class="page" id="page-users">
-                    <div class="page-header" style="margin-bottom:1.5rem;">
-                        <div style="font-size:1.1rem; font-weight:600; color:var(--text-primary);">User Roles</div>
-                        <div style="font-size:0.85rem; color:var(--text-muted); margin-top:0.25rem;">Assign Operations Manager or General Manager access to users</div>
+                    <div class="page-header" style="margin-bottom:1.5rem; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+                        <div>
+                            <div style="font-size:1.1rem; font-weight:600; color:var(--text-primary);">User Roles</div>
+                            <div style="font-size:0.85rem; color:var(--text-muted); margin-top:0.25rem;">Manage manager accounts and role assignments</div>
+                        </div>
+                        <button onclick="openInviteMgrModal()" style="padding:0.5rem 1rem; background:var(--accent-green,#4ade80); color:#0d1117; border:none; border-radius:6px; font-weight:600; font-size:0.85rem; cursor:pointer;">+ Add Manager</button>
                     </div>
                     <div id="users-loading" style="color:var(--text-muted); font-size:0.9rem; padding:1rem 0;">Loading users…</div>
                     <div id="users-table-wrap" style="display:none; overflow-x:auto;">
@@ -3476,6 +3499,42 @@
                 </div>
                 <div id="invite-ct-copy-confirm" style="display:none; font-size:0.8rem; color:var(--accent-green); margin-top:0.5rem;">Link copied to clipboard</div>
                 <div id="invite-ct-loading" style="color:var(--text-muted); font-size:0.875rem; text-align:center; padding:1rem 0;">Generating link…</div>
+            </div>
+        </div>
+
+        <!-- INVITE MANAGER MODAL — GM generates a single-use invite link for a new manager -->
+        <div id="invite-mgr-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:200; align-items:center; justify-content:center;">
+            <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:1.5rem; width:100%; max-width:460px; margin:1rem;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.25rem;">
+                    <div style="font-weight:600; color:var(--text-primary);">Add Manager</div>
+                    <button onclick="closeInviteMgrModal()" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:1.1rem; line-height:1;">&#x2715;</button>
+                </div>
+                <div id="invite-mgr-input-row" style="display:block;">
+                    <div style="font-size:0.85rem; color:var(--text-muted); margin-bottom:1rem;">Enter the manager's email address. They'll receive a link to create their account.</div>
+                    <div style="display:flex; gap:8px;">
+                        <input id="invite-mgr-email" type="email" placeholder="manager@nellisauction.com"
+                            style="flex:1; padding:0.6rem 0.75rem; background:var(--bg-base); border:1px solid var(--border); border-radius:6px; color:var(--text-primary); font-size:0.875rem;" />
+                        <button onclick="submitManagerInvite()" style="padding:0.6rem 1rem; background:var(--accent-green,#4ade80); color:#0d1117; border:none; border-radius:6px; font-weight:600; font-size:0.85rem; cursor:pointer; white-space:nowrap;">Generate Link</button>
+                    </div>
+                    <div id="invite-mgr-error" style="display:none; font-size:0.8rem; color:var(--accent-red,#f87171); margin-top:0.5rem;"></div>
+                </div>
+                <div id="invite-mgr-url-box" style="display:none; gap:8px; align-items:center;">
+                    <input id="invite-mgr-url" readonly style="flex:1; padding:0.6rem 0.75rem; background:var(--bg-base); border:1px solid var(--border); border-radius:6px; color:var(--text-primary); font-size:0.8rem; font-family:'JetBrains Mono',monospace;" />
+                    <button onclick="copyMgrInviteLink()" style="padding:0.6rem 1rem; background:var(--accent-green,#4ade80); color:#0d1117; border:none; border-radius:6px; font-weight:600; font-size:0.85rem; cursor:pointer; white-space:nowrap;">Copy</button>
+                </div>
+                <div id="invite-mgr-copy-confirm" style="display:none; font-size:0.8rem; color:var(--accent-green); margin-top:0.5rem;">Link copied to clipboard</div>
+            </div>
+        </div>
+
+        <!-- REVOKE MANAGER MODAL — GM confirms manager removal -->
+        <div id="revoke-mgr-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:200; align-items:center; justify-content:center;">
+            <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:1.5rem; width:100%; max-width:400px; margin:1rem;">
+                <div style="font-weight:600; color:var(--text-primary); margin-bottom:0.75rem;" id="revoke-mgr-title">Remove Manager</div>
+                <div id="revoke-mgr-message" style="font-size:0.875rem; color:var(--text-muted); margin-bottom:1.25rem;"></div>
+                <div style="display:flex; gap:8px; justify-content:flex-end;">
+                    <button onclick="closeRevokeMgrModal()" style="padding:0.5rem 1rem; background:var(--bg-base); border:1px solid var(--border); border-radius:6px; color:var(--text-muted); cursor:pointer;">Cancel</button>
+                    <button id="revoke-mgr-confirm-btn" onclick="confirmRevokeManager()" style="padding:0.5rem 1rem; background:var(--accent-red,#f87171); color:#fff; border:none; border-radius:6px; font-weight:600; cursor:pointer;">Confirm</button>
+                </div>
             </div>
         </div>
 
@@ -3898,23 +3957,27 @@
                         return `<span style="background:var(--bg-hover,#2a2a2a);color:var(--text-muted);padding:2px 8px;border-radius:99px;font-size:0.75rem;">Manager</span>`;
                     };
 
-                    const actionBtns = (uid) => {
+                    const actionBtns = (uid, email) => {
                         if (adminSet.has(uid) || uid === currentUser.uid) return `<span style="color:var(--text-muted);font-size:0.8rem;">—</span>`;
                         const amActive = roleMap[uid] === "area_manager";
                         const omActive = roleMap[uid] === "ops_manager";
                         const gmActive = roleMap[uid] === "general_manager";
-                        const hasRole = amActive || omActive || gmActive;
-                        const btn = (label, role, active, color, colorDim) =>
-                            `<button onclick="assignRole('${uid}','${role}')" ${active ? "disabled" : ""}
+                        const hasRole  = amActive || omActive || gmActive;
+                        const safeUid  = uid.replace(/'/g, "\\'");
+                        const safeEmail = email.replace(/'/g, "\\'");
+                        const assignBtn = (label, role, active, color, colorDim) =>
+                            `<button onclick="assignRole('${safeUid}','${role}')" ${active ? "disabled" : ""}
                                 style="padding:3px 10px;border-radius:6px;border:1px solid var(--border);background:${active?`var(${colorDim})`:"var(--bg-card)"};color:${active?`var(${color})`:"var(--text-muted)"};cursor:${active?"default":"pointer"};font-size:0.8rem;margin-right:4px;">
                                 ${label}
                             </button>`;
-                        return `
-                            ${btn("Area Manager",    "area_manager",    amActive, "--accent-green,#4ade80", "--accent-green-dim,#0e2f1e")}
-                            ${btn("Ops Manager",     "ops_manager",     omActive, "--accent-cyan,#22d3ee",  "--accent-cyan-dim,#0e2f38")}
-                            ${btn("General Manager", "general_manager", gmActive, "--accent-amber,#f59e0b", "--accent-amber-dim,#3d2f1a")}
-                            ${hasRole ? `<button onclick="removeRole('${uid}')" style="padding:3px 10px;border-radius:6px;border:1px solid var(--accent-red,#f87171);background:transparent;color:var(--accent-red,#f87171);cursor:pointer;font-size:0.8rem;">Remove</button>` : ""}
-                        `;
+                        return `<div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;">
+                            ${assignBtn("Area Manager",    "area_manager",    amActive, "--accent-green,#4ade80", "--accent-green-dim,#0e2f1e")}
+                            ${assignBtn("Ops Manager",     "ops_manager",     omActive, "--accent-cyan,#22d3ee",  "--accent-cyan-dim,#0e2f38")}
+                            ${assignBtn("General Manager", "general_manager", gmActive, "--accent-amber,#f59e0b", "--accent-amber-dim,#3d2f1a")}
+                            ${hasRole ? `<button onclick="removeRole('${safeUid}')" style="padding:3px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg-card);color:var(--text-muted);cursor:pointer;font-size:0.8rem;margin-right:4px;">Remove Role</button>` : ""}
+                            <button onclick="openRevokeMgrModal('${safeUid}','${safeEmail}','remove')" style="padding:3px 10px;border-radius:6px;border:1px solid var(--accent-red,#f87171);background:transparent;color:var(--accent-red,#f87171);cursor:pointer;font-size:0.8rem;margin-right:4px;">Revoke</button>
+                            <button onclick="openRevokeMgrModal('${safeUid}','${safeEmail}','delete')" style="padding:3px 10px;border-radius:6px;border:1px solid var(--accent-red,#f87171);background:var(--accent-red-dim);color:var(--accent-red,#f87171);cursor:pointer;font-size:0.8rem;">Delete</button>
+                        </div>`;
                     };
 
                     const rows = Object.entries(userMap).sort(([,a],[,b]) => a.localeCompare(b));
@@ -3922,7 +3985,7 @@
                         `<tr style="border-bottom:1px solid var(--border);">
                             <td style="padding:10px 12px;color:var(--text-primary);">${email}</td>
                             <td style="padding:10px 12px;">${rolePill(uid)}</td>
-                            <td style="padding:10px 12px;">${actionBtns(uid)}</td>
+                            <td style="padding:10px 12px;">${actionBtns(uid, email)}</td>
                         </tr>`
                     ).join("") || `<tr><td colspan="3" style="padding:16px;color:var(--text-muted);text-align:center;">No users found.</td></tr>`;
 
@@ -4146,7 +4209,11 @@
                                 const inviteDoc = await db.collection("invites").doc(inviteToken).get();
                                 if (inviteDoc.exists && !inviteDoc.data().used) {
                                     hideAuthGate();
-                                    showCTSignupScreen(inviteDoc.data(), inviteToken);
+                                    if (inviteDoc.data().type === "manager") {
+                                        showManagerSignupScreen(inviteDoc.data(), inviteToken);
+                                    } else {
+                                        showCTSignupScreen(inviteDoc.data(), inviteToken);
+                                    }
                                 } else {
                                     hideAuthGate();
                                     document.getElementById("ct-invalid-invite-screen").style.display = "flex";
@@ -6871,6 +6938,166 @@
                 } catch (e) {
                     // Fallback: select the input so the user can copy manually
                     document.getElementById("invite-ct-url").select();
+                }
+            }
+
+            // ══════════════════════════════════════════
+            // INVITE MANAGER — GM creates a new manager account via invite link
+            // ══════════════════════════════════════════
+
+            function openInviteMgrModal() {
+                document.getElementById("invite-mgr-overlay").style.display = "flex";
+                document.getElementById("invite-mgr-input-row").style.display = "block";
+                document.getElementById("invite-mgr-url-box").style.display = "none";
+                document.getElementById("invite-mgr-copy-confirm").style.display = "none";
+                document.getElementById("invite-mgr-error").style.display = "none";
+                document.getElementById("invite-mgr-email").value = "";
+            }
+
+            function closeInviteMgrModal() {
+                document.getElementById("invite-mgr-overlay").style.display = "none";
+            }
+
+            async function submitManagerInvite() {
+                const email = document.getElementById("invite-mgr-email").value.trim();
+                const errEl = document.getElementById("invite-mgr-error");
+                errEl.style.display = "none";
+                if (!email || !email.includes("@")) {
+                    errEl.textContent = "Please enter a valid email address.";
+                    errEl.style.display = "block";
+                    return;
+                }
+                try {
+                    const token = crypto.randomUUID();
+                    await db.collection("invites").doc(token).set({
+                        type: "manager",
+                        email,
+                        createdBy: currentUser.uid,
+                        used: false,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    const url = `${window.location.origin}${window.location.pathname}?invite=${token}`;
+                    document.getElementById("invite-mgr-url").value = url;
+                    document.getElementById("invite-mgr-input-row").style.display = "none";
+                    document.getElementById("invite-mgr-url-box").style.display = "flex";
+                } catch (e) {
+                    errEl.textContent = "Error generating link. Please try again.";
+                    errEl.style.display = "block";
+                    console.error("Manager invite error:", e);
+                }
+            }
+
+            async function copyMgrInviteLink() {
+                const url = document.getElementById("invite-mgr-url").value;
+                try {
+                    await navigator.clipboard.writeText(url);
+                    document.getElementById("invite-mgr-copy-confirm").style.display = "block";
+                    setTimeout(() => {
+                        document.getElementById("invite-mgr-copy-confirm").style.display = "none";
+                    }, 2000);
+                } catch (e) {
+                    document.getElementById("invite-mgr-url").select();
+                }
+            }
+
+            function showManagerSignupScreen(inviteData, token) {
+                pendingInviteToken = token;
+                pendingInviteData = inviteData;
+                const screen = document.getElementById("mgr-signup-screen");
+                screen.style.display = "flex";
+                document.getElementById("mgr-signup-email").value = inviteData.email || "";
+                document.getElementById("mgr-signup-error").style.display = "none";
+                document.getElementById("mgr-signup-password").focus();
+            }
+
+            async function handleManagerSignup() {
+                const email    = document.getElementById("mgr-signup-email").value.trim();
+                const password = document.getElementById("mgr-signup-password").value;
+                const errEl    = document.getElementById("mgr-signup-error");
+                const btn      = document.getElementById("mgr-signup-btn");
+                const loadEl   = document.getElementById("mgr-signup-loading");
+
+                errEl.style.display = "none";
+                if (!password || password.length < 6) {
+                    errEl.textContent = "Password must be at least 6 characters.";
+                    errEl.style.display = "block";
+                    return;
+                }
+
+                btn.style.display  = "none";
+                loadEl.style.display = "block";
+                ctSignupInProgress = true; // reuse flag to block onAuthStateChanged initApp()
+
+                try {
+                    const cred = await auth.createUserWithEmailAndPassword(email, password);
+                    const uid  = cred.user.uid;
+                    await db.collection("users").doc(uid).set({
+                        email,
+                        lastLogin: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    if (pendingInviteToken) {
+                        await db.collection("invites").doc(pendingInviteToken).update({ used: true });
+                    }
+                    window.location.reload();
+                } catch (e) {
+                    ctSignupInProgress = false;
+                    btn.style.display    = "block";
+                    loadEl.style.display = "none";
+                    errEl.textContent    = friendlyAuthError(e.code) || e.message || "Failed to create account.";
+                    errEl.style.display  = "block";
+                }
+            }
+
+            // ══════════════════════════════════════════
+            // REVOKE / DELETE MANAGER — GM removes a manager's access
+            // ══════════════════════════════════════════
+
+            let pendingRevokeMgrId   = null;
+            let pendingRevokeMgrMode = "remove"; // "remove" | "delete"
+
+            function openRevokeMgrModal(uid, email, mode) {
+                pendingRevokeMgrId   = uid;
+                pendingRevokeMgrMode = mode;
+                document.getElementById("revoke-mgr-title").textContent   = mode === "delete" ? "Delete Manager Profile" : "Remove Manager Access";
+                document.getElementById("revoke-mgr-message").innerHTML   = mode === "delete"
+                    ? `This will permanently block <strong>${email}</strong> from accessing MeetOPS and remove all their data. This cannot be undone.`
+                    : `This will revoke <strong>${email}</strong>'s access to MeetOPS. They will be signed out on their next load.`;
+                document.getElementById("revoke-mgr-confirm-btn").textContent = mode === "delete" ? "Delete" : "Remove";
+                document.getElementById("revoke-mgr-overlay").style.display = "flex";
+            }
+
+            function closeRevokeMgrModal() {
+                document.getElementById("revoke-mgr-overlay").style.display = "none";
+                pendingRevokeMgrId = null;
+            }
+
+            async function confirmRevokeManager() {
+                if (!pendingRevokeMgrId) return;
+                const btn = document.getElementById("revoke-mgr-confirm-btn");
+                btn.disabled    = true;
+                btn.textContent = "Working…";
+                const uid  = pendingRevokeMgrId;
+                const mode = pendingRevokeMgrMode;
+
+                try {
+                    // Always revoke access via the gate doc
+                    await db.collection("revokedUsers").doc(uid).set({
+                        revokedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        revokedBy: currentUser.uid
+                    });
+                    // Remove elevated role if any
+                    await db.collection("roles").doc(uid).delete().catch(() => {});
+                    if (mode === "delete") {
+                        // Full profile removal — delete from user registry too
+                        await db.collection("users").doc(uid).delete().catch(() => {});
+                    }
+                    closeRevokeMgrModal();
+                    renderUsersPage();
+                } catch (e) {
+                    alert("Failed to remove manager. Check your permissions.");
+                    console.error("confirmRevokeManager error:", e);
+                    btn.disabled    = false;
+                    btn.textContent = pendingRevokeMgrMode === "delete" ? "Delete" : "Remove";
                 }
             }
 
