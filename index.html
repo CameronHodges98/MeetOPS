@@ -3544,7 +3544,7 @@
             const db = firebase.firestore();
 
             let currentUser = null;
-            let currentUserRole = "manager"; // 'admin' | 'general_manager' | 'ops_manager' | 'manager' | 'ct'
+            let currentUserRole = "manager"; // 'admin' | 'general_manager' | 'ops_manager' | 'area_manager' | 'manager' | 'ct'
             let currentUserSupervisor = null; // matched full supervisor name from data, null for admin/OM/GM
             let selectedManagerFilter = "all"; // supervisor name or "all" — OM/GM manager filter dropdown
             let currentCTName = ""; // full name of CT user from certifiedTrainers doc
@@ -3697,7 +3697,7 @@
                     // Check for elevated org role (ops_manager / general_manager) before CT/manager fallback
                     const orgRoleDoc = await db.collection("roles").doc(currentUser.uid).get();
                     const orgRole = orgRoleDoc.exists ? orgRoleDoc.data().role : null;
-                    if (orgRole === "ops_manager" || orgRole === "general_manager") {
+                    if (orgRole === "ops_manager" || orgRole === "general_manager" || orgRole === "area_manager") {
                         currentUserRole = orgRole;
                         currentUserSupervisor = null;
                         clearManagerMatchWarning();
@@ -3765,6 +3765,9 @@
                     } else if (currentUserRole === "ops_manager") {
                         nameEl.textContent = currentUser.email.split("@")[0];
                         roleEl.textContent = "Ops Manager";
+                    } else if (currentUserRole === "area_manager") {
+                        nameEl.textContent = currentUser.email.split("@")[0];
+                        roleEl.textContent = "Area Manager";
                     } else {
                         const fallbackName = currentUser.email.split("@")[0];
                         nameEl.textContent = currentUserSupervisor || fallbackName;
@@ -3772,7 +3775,7 @@
                     }
                 }
 
-                // Upload buttons — admin and GM only
+                // Upload buttons — admin and GM only; OM and AM do not upload
                 const uploadBtns = document.getElementById("sidebar-upload-btns");
                 if (uploadBtns)
                     uploadBtns.style.display =
@@ -3829,7 +3832,7 @@
             function updateManagerFilter() {
                 const sel = document.getElementById("manager-filter");
                 if (!sel) return;
-                const isOrgRole = currentUserRole === "ops_manager" || currentUserRole === "general_manager";
+                const isOrgRole = currentUserRole === "ops_manager" || currentUserRole === "general_manager" || currentUserRole === "area_manager";
                 sel.style.display = isOrgRole ? "" : "none";
                 if (!isOrgRole) return;
                 const current = sel.value;
@@ -3864,40 +3867,48 @@
                     const adminSet = new Set();
                     adminsSnap.forEach(d => adminSet.add(d.id));
 
+                    // Merge users registry + anyone already in roles (in case they were
+                    // manually assigned via console before logging in post-deployment).
+                    const userMap = {};
+                    usersSnap.forEach(d => { userMap[d.id] = d.data().email || d.id; });
+                    rolesSnap.forEach(d => { if (!userMap[d.id]) userMap[d.id] = d.id; });
+                    adminsSnap.forEach(d => { if (!userMap[d.id]) userMap[d.id] = d.id; });
+
                     const rolePill = (uid) => {
                         if (adminSet.has(uid)) return `<span style="background:var(--accent-purple-dim,#3b2f5e);color:var(--accent-purple,#a78bfa);padding:2px 8px;border-radius:99px;font-size:0.75rem;">Admin</span>`;
                         if (roleMap[uid] === "general_manager") return `<span style="background:var(--accent-amber-dim,#3d2f1a);color:var(--accent-amber,#f59e0b);padding:2px 8px;border-radius:99px;font-size:0.75rem;">General Manager</span>`;
                         if (roleMap[uid] === "ops_manager") return `<span style="background:var(--accent-cyan-dim,#0e2f38);color:var(--accent-cyan,#22d3ee);padding:2px 8px;border-radius:99px;font-size:0.75rem;">Ops Manager</span>`;
+                        if (roleMap[uid] === "area_manager") return `<span style="background:var(--accent-green-dim,#0e2f1e);color:var(--accent-green,#4ade80);padding:2px 8px;border-radius:99px;font-size:0.75rem;">Area Manager</span>`;
                         return `<span style="background:var(--bg-hover,#2a2a2a);color:var(--text-muted);padding:2px 8px;border-radius:99px;font-size:0.75rem;">Manager</span>`;
                     };
 
-                    const actionBtns = (uid, email) => {
+                    const actionBtns = (uid) => {
                         if (adminSet.has(uid) || uid === currentUser.uid) return `<span style="color:var(--text-muted);font-size:0.8rem;">—</span>`;
-                        const safeEmail = email.replace(/'/g, "\\'");
+                        const amActive = roleMap[uid] === "area_manager";
                         const omActive = roleMap[uid] === "ops_manager";
                         const gmActive = roleMap[uid] === "general_manager";
+                        const hasRole = amActive || omActive || gmActive;
+                        const btn = (label, role, active, color, colorDim) =>
+                            `<button onclick="assignRole('${uid}','${role}')" ${active ? "disabled" : ""}
+                                style="padding:3px 10px;border-radius:6px;border:1px solid var(--border);background:${active?`var(${colorDim})`:"var(--bg-card)"};color:${active?`var(${color})`:"var(--text-muted)"};cursor:${active?"default":"pointer"};font-size:0.8rem;margin-right:4px;">
+                                ${label}
+                            </button>`;
                         return `
-                            <button onclick="assignRole('${uid}','ops_manager')" ${omActive ? "disabled" : ""}
-                                style="padding:3px 10px;border-radius:6px;border:1px solid var(--border);background:${omActive?"var(--accent-cyan-dim,#0e2f38)":"var(--bg-card)"};color:${omActive?"var(--accent-cyan,#22d3ee)":"var(--text-muted)"};cursor:${omActive?"default":"pointer"};font-size:0.8rem;margin-right:4px;">
-                                Ops Manager
-                            </button>
-                            <button onclick="assignRole('${uid}','general_manager')" ${gmActive ? "disabled" : ""}
-                                style="padding:3px 10px;border-radius:6px;border:1px solid var(--border);background:${gmActive?"var(--accent-amber-dim,#3d2f1a)":"var(--bg-card)"};color:${gmActive?"var(--accent-amber,#f59e0b)":"var(--text-muted)"};cursor:${gmActive?"default":"pointer"};font-size:0.8rem;margin-right:4px;">
-                                General Manager
-                            </button>
-                            ${(omActive || gmActive) ? `<button onclick="removeRole('${uid}')" style="padding:3px 10px;border-radius:6px;border:1px solid var(--accent-red,#f87171);background:transparent;color:var(--accent-red,#f87171);cursor:pointer;font-size:0.8rem;">Remove</button>` : ""}
+                            ${btn("Area Manager",    "area_manager",    amActive, "--accent-green,#4ade80", "--accent-green-dim,#0e2f1e")}
+                            ${btn("Ops Manager",     "ops_manager",     omActive, "--accent-cyan,#22d3ee",  "--accent-cyan-dim,#0e2f38")}
+                            ${btn("General Manager", "general_manager", gmActive, "--accent-amber,#f59e0b", "--accent-amber-dim,#3d2f1a")}
+                            ${hasRole ? `<button onclick="removeRole('${uid}')" style="padding:3px 10px;border-radius:6px;border:1px solid var(--accent-red,#f87171);background:transparent;color:var(--accent-red,#f87171);cursor:pointer;font-size:0.8rem;">Remove</button>` : ""}
                         `;
                     };
 
-                    tbody.innerHTML = usersSnap.docs.map(d => {
-                        const uid = d.id;
-                        const { email } = d.data();
-                        return `<tr style="border-bottom:1px solid var(--border);">
+                    const rows = Object.entries(userMap).sort(([,a],[,b]) => a.localeCompare(b));
+                    tbody.innerHTML = rows.map(([uid, email]) =>
+                        `<tr style="border-bottom:1px solid var(--border);">
                             <td style="padding:10px 12px;color:var(--text-primary);">${email}</td>
                             <td style="padding:10px 12px;">${rolePill(uid)}</td>
-                            <td style="padding:10px 12px;">${actionBtns(uid, email)}</td>
-                        </tr>`;
-                    }).join("") || `<tr><td colspan="3" style="padding:16px;color:var(--text-muted);text-align:center;">No users have logged in yet.</td></tr>`;
+                            <td style="padding:10px 12px;">${actionBtns(uid)}</td>
+                        </tr>`
+                    ).join("") || `<tr><td colspan="3" style="padding:16px;color:var(--text-muted);text-align:center;">No users found.</td></tr>`;
 
                     loadingEl.style.display = "none";
                     tableWrap.style.display = "block";
@@ -4700,7 +4711,7 @@
                     rows = rows.filter((r) => r.LOCATION === loc);
 
                 // Org roles: filter by selected manager when one is chosen
-                if ((currentUserRole === "ops_manager" || currentUserRole === "general_manager") && selectedManagerFilter !== "all") {
+                if ((currentUserRole === "ops_manager" || currentUserRole === "general_manager" || currentUserRole === "area_manager") && selectedManagerFilter !== "all") {
                     rows = rows.filter(r => r["SUPERVISOR"] === selectedManagerFilter);
                 }
 
@@ -5551,7 +5562,7 @@
                     if (loc !== "all") rows = rows.filter(r => r.LOCATION === loc);
                     if (currentUserRole === "manager" && currentUserSupervisor) {
                         rows = rows.filter(r => r["SUPERVISOR"] === currentUserSupervisor);
-                    } else if ((currentUserRole === "ops_manager" || currentUserRole === "general_manager") && selectedManagerFilter !== "all") {
+                    } else if ((currentUserRole === "ops_manager" || currentUserRole === "general_manager" || currentUserRole === "area_manager") && selectedManagerFilter !== "all") {
                         rows = rows.filter(r => r["SUPERVISOR"] === selectedManagerFilter);
                     }
 
@@ -6920,7 +6931,7 @@
                 // Load CTs first — must be awaited so availableCTs is populated before the
                 // coaching panel and the onSnapshot listener render their CT dropdowns/sections.
                 if (currentUserRole === "manager" || currentUserRole === "admin" ||
-                    currentUserRole === "ops_manager" || currentUserRole === "general_manager") {
+                    currentUserRole === "ops_manager" || currentUserRole === "general_manager" || currentUserRole === "area_manager") {
                     await loadAvailableCTs();
                     startManagerCoachingListener(); // first snapshot now sees populated availableCTs
                 }
