@@ -120,7 +120,7 @@
                 color: var(--text-primary);
                 min-height: 100vh;
                 display: flex;
-                overflow: hidden;
+                overflow-x: clip;
             }
 
             /* ─── NAV ─── */
@@ -348,8 +348,9 @@
             #main {
                 margin-left: var(--nav-width);
                 flex: 1;
-                height: 100vh;
-                overflow-y: auto;
+                min-width: 0;
+                min-height: 100vh;
+                overflow-x: clip;
                 display: flex;
                 flex-direction: column;
                 transition: margin-left 0.22s cubic-bezier(0.4, 0, 0.2, 1);
@@ -430,6 +431,8 @@
             #content {
                 padding: 24px;
                 flex: 1;
+                min-width: 0;
+                max-width: 100%;
             }
 
             /* ─── PAGES ─── */
@@ -573,6 +576,8 @@
                 border: 1px solid var(--border);
                 border-radius: var(--radius-lg);
                 padding: 18px;
+                min-width: 0;
+                overflow: hidden;
             }
 
             .chart-card-header {
@@ -590,109 +595,6 @@
 
             .chart-card-sub {
                 font-size: 11px;
-                color: var(--text-muted);
-            }
-
-            /* ─── MANAGER TABLE ─── */
-            .manager-grid {
-                display: grid;
-                grid-template-columns: 1fr 1fr;
-                gap: 16px;
-                margin-bottom: 20px;
-            }
-
-            .manager-card {
-                background: var(--bg-card);
-                border: 1px solid var(--border);
-                border-radius: var(--radius-lg);
-                overflow: hidden;
-                cursor: pointer;
-                transition: border-color 0.15s;
-            }
-
-            .manager-card:hover {
-                border-color: var(--accent-cyan);
-            }
-
-            .manager-card-header {
-                padding: 14px 16px;
-                border-bottom: 1px solid var(--border-light);
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-            }
-
-            .manager-info {
-                display: flex;
-                align-items: center;
-                gap: 10px;
-            }
-
-            .manager-avatar {
-                width: 34px;
-                height: 34px;
-                border-radius: 50%;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 12px;
-                font-weight: 700;
-                background: var(--accent-cyan-dim);
-                color: var(--accent-cyan);
-                flex-shrink: 0;
-            }
-
-            .manager-name {
-                font-size: 13.5px;
-                font-weight: 600;
-                color: var(--text-primary);
-            }
-
-            .manager-meta {
-                font-size: 11px;
-                color: var(--text-muted);
-            }
-
-            .manager-kpis {
-                display: grid;
-                grid-template-columns: repeat(4, 1fr);
-                padding: 12px 16px;
-                gap: 8px;
-            }
-
-            .mgr-kpi-label {
-                font-size: 10px;
-                color: var(--text-muted);
-                text-transform: uppercase;
-                letter-spacing: 0.5px;
-                margin-bottom: 3px;
-            }
-
-            .mgr-kpi-val {
-                font-size: 15px;
-                font-weight: 700;
-                font-family: "JetBrains Mono", monospace;
-                color: var(--text-primary);
-            }
-
-            .trend-pill {
-                font-size: 10px;
-                font-weight: 600;
-                padding: 2px 6px;
-                border-radius: 4px;
-                font-family: "JetBrains Mono", monospace;
-            }
-
-            .trend-pill.up {
-                background: var(--accent-green-dim);
-                color: var(--accent-green);
-            }
-            .trend-pill.down {
-                background: var(--accent-red-dim);
-                color: var(--accent-red);
-            }
-            .trend-pill.neutral {
-                background: var(--bg-surface);
                 color: var(--text-muted);
             }
 
@@ -785,53 +687,6 @@
             }
 
             /* ─── MANAGER CARD PAIR (snapshot + performers side-by-side) ─── */
-            .mgr-pair {
-                display: flex;
-                gap: 12px;
-                align-items: stretch;
-            }
-            /* Left snapshot card stretches to fill remaining space */
-            .mgr-pair > .manager-card {
-                flex: 1 1 0;
-                min-width: 0;
-            }
-            /* Right performers card — fixed narrow width, same visual style as snapshot card */
-            .mgr-performers-card {
-                flex: 0 0 170px;
-                width: 170px;
-                background: var(--bg-card);
-                border: 1px solid var(--border);
-                border-radius: var(--radius-lg);
-                padding: 14px 14px 12px 14px;
-                display: flex;
-                flex-direction: column;
-                gap: 10px;
-            }
-            .mgr-performers-label {
-                font-size: 10px;
-                font-weight: 600;
-                text-transform: uppercase;
-                letter-spacing: 0.6px;
-                color: var(--text-muted);
-            }
-            .mgr-performers-lines {
-                display: flex;
-                flex-direction: column;
-                gap: 6px;
-            }
-            /* ─── MANAGER CARD TOP/BOTTOM PERFORMER BADGES ─── */
-            /* Used inside .mgr-performers-card */
-            .perf-highlight {
-                font-size: 11px;
-                font-family: "JetBrains Mono", monospace;
-                display: flex;
-                align-items: center;
-                gap: 4px;
-                line-height: 1.4;
-            }
-            .perf-highlight.top { color: #f5c518; }
-            .perf-highlight.bottom { color: var(--accent-red); }
-
             /* ─── EMPLOYEE PAGE ─── */
             .search-input {
                 background: var(--bg-card);
@@ -927,8 +782,10 @@
             }
 
             /* ─── EMPLOYEE DETAIL ─── */
+            /* #employee-detail is now inside #employee-detail-overlay modal;
+               visibility is controlled by the overlay, not the inner div. */
             #employee-detail {
-                display: none;
+                display: block;
             }
 
             .detail-header {
@@ -1484,16 +1341,6 @@
                 .chart-grid-3 {
                     grid-template-columns: 1fr 1fr;
                 }
-                .manager-grid {
-                    grid-template-columns: 1fr;
-                }
-                /* Pairs still sit side-by-side at tablet width */
-                .mgr-pair {
-                    flex-direction: row;
-                }
-                .manager-kpis {
-                    grid-template-columns: repeat(3, 1fr) !important;
-                }
                 .insights-grid {
                     grid-template-columns: 1fr;
                 }
@@ -1515,6 +1362,11 @@
                 /* Upload modal */
                 .upload-modal {
                     width: 90vw !important;
+                }
+
+                /* CT employee grid — reduce min card width for tablet */
+                #ct-employee-grid {
+                    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)) !important;
                 }
             }
 
@@ -1599,7 +1451,6 @@
                 /* Charts — all stack single column */
                 .chart-grid,
                 .chart-grid-3,
-                .manager-grid,
                 .insights-grid {
                     grid-template-columns: 1fr;
                 }
@@ -1616,24 +1467,6 @@
                 /* Employee grid */
                 .employee-grid {
                     grid-template-columns: 1fr;
-                }
-
-                /* Manager cards */
-                /* Stack the pair vertically on small screens so the performers card
-                   doesn't get squeezed too narrow */
-                .mgr-pair {
-                    flex-direction: column;
-                }
-                .mgr-performers-card {
-                    width: 100%;
-                    flex: none;
-                }
-                .manager-kpis {
-                    grid-template-columns: repeat(2, 1fr) !important;
-                }
-                .manager-card-header {
-                    flex-wrap: wrap;
-                    gap: 8px;
                 }
 
                 /* Detail headers */
@@ -1704,6 +1537,73 @@
                 div[style*="minmax(260px"] {
                     grid-template-columns: 1fr !important;
                 }
+
+                /* CT employee grid — stack to 1 column on mobile */
+                #ct-employee-grid {
+                    grid-template-columns: 1fr !important;
+                }
+
+                /* Date range picker — shrink to fit mobile topbar */
+                #date-range-input {
+                    width: 140px;
+                    font-size: 11px;
+                }
+
+                /* Topbar filters row — wrap and fill width */
+                #topbar-filters {
+                    width: 100%;
+                    flex-wrap: wrap;
+                    gap: 6px;
+                }
+
+                /* KPI delta text — smaller to fit 2-column cards */
+                .kpi-delta {
+                    font-size: 10px;
+                }
+
+                /* Manager detail header — reduce hardcoded large font sizes */
+                #mgr-detail-header [style*="font-size:22px"],
+                #mgr-detail-header [style*="font-size: 22px"] {
+                    font-size: 16px !important;
+                }
+                #mgr-detail-header [style*="font-size:20px"],
+                #mgr-detail-header [style*="font-size: 20px"] {
+                    font-size: 15px !important;
+                }
+
+                /* Chart card headers — wrap title + controls on narrow cards */
+                .chart-card-header {
+                    flex-wrap: wrap;
+                    gap: 8px;
+                }
+
+                /* Coaching cards — 2-column on tablet/phone */
+                .coaching-cards-grid {
+                    grid-template-columns: repeat(2, 1fr);
+                    gap: 8px;
+                }
+
+                /* Coaching page header — tighter on mobile */
+                #page-coaching .page-header {
+                    margin-bottom: 0.75rem !important;
+                }
+
+                /* CT employee detail stat tiles — force 2 columns */
+                #ct-stats-grid {
+                    grid-template-columns: repeat(2, 1fr) !important;
+                }
+
+                /* User roles table — hide Shift/Team column, truncate email */
+                #users-table-wrap th:nth-child(3),
+                #users-table-wrap td:nth-child(3) {
+                    display: none;
+                }
+                #users-table-wrap td:first-child {
+                    max-width: 120px;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    white-space: nowrap;
+                }
             }
 
             /* ─────────────────────────────────────────
@@ -1759,6 +1659,38 @@
                 }
             }
 
+            /* ─────────────────────────────────────────
+     RESPONSIVE — SMALL PHONES (≤480px)
+  ───────────────────────────────────────── */
+            @media (max-width: 480px) {
+                .kpi-grid {
+                    gap: 6px;
+                }
+                .kpi-card {
+                    padding: 10px 12px;
+                }
+                .kpi-value {
+                    font-size: 20px;
+                }
+                #date-range-input {
+                    width: 110px;
+                }
+                .emp-stat-val {
+                    font-size: 14px;
+                }
+                .chart-card {
+                    padding: 12px;
+                }
+                /* Coaching cards — single column on very small phones */
+                .coaching-cards-grid {
+                    grid-template-columns: 1fr;
+                }
+                /* Coaching manager section spacing */
+                .coaching-manager-section {
+                    margin-bottom: 1rem;
+                }
+            }
+
             /* ─── COACHING CARDS (CT landing page + manager coaching panel) ─── */
             .coaching-manager-section { margin-bottom: 2rem; }
             .coaching-manager-header { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); margin-bottom: 0.75rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); }
@@ -1774,6 +1706,71 @@
             .coaching-emp-card.status-assigned .coaching-emp-status { color: var(--accent-red); }
             .coaching-emp-card.status-submitted .coaching-emp-status,
             .coaching-emp-card.status-locked .coaching-emp-status { color: var(--accent-green); }
+            /* CT coaching card — base styles (scaleable via media queries) */
+            .ct-coaching-card { padding: 12px 14px; border-radius: var(--radius); transition: all 0.2s; cursor: pointer; }
+            .ct-coaching-card:hover { background: var(--bg-card-hover) !important; border-color: var(--accent-cyan) !important; }
+            .ct-card-name { font-size: 13px; font-weight: 600; line-height: 1.35; }
+            .ct-card-manager { font-size: 10px; color: var(--text-muted); margin-top: 3px; }
+            .ct-status-badge { font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 3px; font-family: monospace; white-space: nowrap; }
+            .ct-stat-tile { padding: 0.75rem; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; }
+            .ct-stat-label { font-size: 0.7rem; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.06em; margin-bottom: 4px; }
+            .ct-stat-value { font-size: 1.4rem; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+
+            /* ── iPad A16 coaching layout (641–1180px covers portrait + landscape) ── */
+            @media (min-width: 641px) and (max-width: 1180px) {
+                #page-coaching .coaching-cards-grid {
+                    grid-template-columns: repeat(2, 1fr);
+                    gap: 16px;
+                }
+                #page-coaching .coaching-manager-section {
+                    margin-bottom: 1.75rem;
+                }
+                #page-coaching .coaching-manager-header {
+                    font-size: 0.85rem;
+                    margin-bottom: 1rem;
+                    padding-bottom: 0.65rem;
+                }
+                .ct-coaching-card {
+                    padding: 20px 22px;
+                }
+                .ct-card-name {
+                    font-size: 17px;
+                }
+                .ct-card-manager {
+                    font-size: 13px;
+                    margin-top: 5px;
+                }
+                .ct-status-badge {
+                    font-size: 11px;
+                    padding: 4px 10px;
+                }
+                #ct-stats-grid {
+                    grid-template-columns: repeat(2, 1fr) !important;
+                    gap: 16px;
+                }
+                .ct-stat-tile {
+                    padding: 1.1rem 1.25rem;
+                }
+                .ct-stat-label {
+                    font-size: 0.8rem;
+                    margin-bottom: 6px;
+                }
+                .ct-stat-value {
+                    font-size: 2.1rem;
+                }
+                #ct-employee-stats > div:first-child > div:first-child {
+                    font-size: 1.35rem;
+                }
+                #ct-employee-stats > div:first-child > div:last-child {
+                    font-size: 0.9rem;
+                }
+            }
+            /* ── CT custom dropdown — replaces native <select> to avoid WebKit fixed-scroll positioning bug ── */
+            .ct-custom-sel-btn { width:100%; font-size:12px; padding:6px 8px 6px 10px; background:var(--bg-card); border:1px solid var(--border); border-radius:6px; color:var(--text-primary); cursor:pointer; text-align:left; display:flex; align-items:center; justify-content:space-between; gap:4px; flex:1; min-width:120px; }
+            #ct-floating-dropdown { position:fixed; z-index:99999; background:var(--bg-card); border:1px solid var(--border); border-radius:8px; box-shadow:0 8px 32px rgba(0,0,0,0.5); overflow-y:auto; max-height:220px; }
+            .ct-drop-item { padding:9px 14px; font-size:12px; color:var(--text-primary); cursor:pointer; transition:background 0.1s; }
+            .ct-drop-item:hover { background:var(--bg-surface); }
+            .ct-drop-item.ct-drop-placeholder { color:var(--text-muted); }
             /* ── Flatpickr calendar — MeetOPS theme overrides ── */
             .flatpickr-calendar { background:var(--bg-card) !important; border:1px solid var(--border) !important; border-radius:10px !important; box-shadow:0 8px 32px rgba(0,0,0,0.4) !important; font-family:'Space Grotesk',sans-serif !important; }
             .flatpickr-months .flatpickr-month, .flatpickr-weekdays { background:var(--bg-card) !important; }
@@ -1944,7 +1941,7 @@
             </div>
 
             <!-- Forgot password panel — shown in place of the sign-in form -->
-            <div id="forgot-password-panel" style="display:none; width:380px; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-lg); padding:32px; text-align:center;">
+            <div id="forgot-password-panel" style="display:none; width:min(380px, 92vw); background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-lg); padding:32px; text-align:center;">
                 <div style="font-size:18px; font-weight:700; color:var(--text-primary); margin-bottom:8px;">Reset Password</div>
                 <div style="font-size:13px; color:var(--text-muted); margin-bottom:20px;">Enter your email and we'll send a reset link.</div>
                 <div id="forgot-error" style="display:none; background:var(--accent-red-dim); color:var(--accent-red); border:1px solid rgba(248,81,73,0.2); border-radius:var(--radius); padding:10px 14px; font-size:12.5px; margin-bottom:16px; text-align:left;"></div>
@@ -2080,40 +2077,7 @@
                     </svg>
                     <span>Managers</span>
                 </div>
-                <div
-                    class="nav-item"
-                    data-label="Employees"
-                    data-page="employees"
-                    onclick="showPage('employees', this)"
-                >
-                    <svg
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2"
-                    >
-                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                        <circle cx="12" cy="7" r="4" />
-                    </svg>
-                    <span>Employees</span>
-                </div>
                 <div class="nav-section-label">Analysis</div>
-                <div
-                    class="nav-item"
-                    data-label="Trends"
-                    data-page="trends"
-                    onclick="showPage('trends', this)"
-                >
-                    <svg
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2"
-                    >
-                        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-                    </svg>
-                    <span>Trends</span>
-                </div>
                 <div
                     class="nav-item"
                     data-label="Cycle Time"
@@ -2131,23 +2095,6 @@
                         <path d="M16 2l2 2-2 2" />
                     </svg>
                     <span>Cycle Time</span>
-                </div>
-                <div
-                    class="nav-item"
-                    data-label="Data History"
-                    data-page="history"
-                    onclick="showPage('history', this)"
-                >
-                    <svg
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2"
-                    >
-                        <circle cx="12" cy="12" r="10" />
-                        <polyline points="12 6 12 12 16 14" />
-                    </svg>
-                    <span>Data History</span>
                 </div>
                 <!-- User Roles nav — GM only; hidden by default -->
                 <div
@@ -2226,6 +2173,41 @@
                         <span class="btn-label">Upload Cycle Time</span>
                     </button>
                 </div>
+                <!-- Manage Data link — admin and GM only; navigates to the History page
+                     Visibility is controlled in applyRoleUI() alongside the old nav item logic -->
+                <button
+                    id="manage-data-btn"
+                    onclick="showPage('history', null)"
+                    style="
+                        display: none;
+                        width: 100%;
+                        margin-top: 8px;
+                        padding: 8px 10px;
+                        background: none;
+                        border: 1px solid var(--border);
+                        border-radius: var(--radius);
+                        color: var(--text-muted);
+                        font-family: 'Space Grotesk', sans-serif;
+                        font-size: 12px;
+                        font-weight: 500;
+                        cursor: pointer;
+                        display: none;
+                        align-items: center;
+                        justify-content: center;
+                        gap: 6px;
+                        transition: border-color 0.15s, color 0.15s;
+                        white-space: nowrap;
+                        overflow: hidden;
+                    "
+                    onmouseover="this.style.borderColor='var(--accent-cyan)';this.style.color='var(--accent-cyan)'"
+                    onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-muted)'"
+                >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;flex-shrink:0">
+                        <circle cx="12" cy="12" r="10" />
+                        <polyline points="12 6 12 12 16 14" />
+                    </svg>
+                    <span class="btn-label">Manage Data</span>
+                </button>
             </div>
         </div>
 
@@ -2238,21 +2220,6 @@
                 </div>
                 <div class="topbar-right" id="topbar-right">
                     <div id="topbar-filters" style="display:flex;align-items:center;gap:8px;">
-                    <select
-                        class="filter-select"
-                        id="location-filter"
-                        onchange="applyFilters()"
-                    >
-                        <option value="all">All Locations</option>
-                    </select>
-                    <select
-                        class="filter-select"
-                        id="manager-filter"
-                        onchange="applyManagerFilter()"
-                        style="display:none"
-                    >
-                        <option value="all">All Managers</option>
-                    </select>
                     <div style="display: flex; align-items: center; gap: 6px">
                         <!-- Hidden value stores — all JS reads .value from these unchanged -->
                         <input type="hidden" id="date-from" />
@@ -2441,14 +2408,6 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="section-header">
-                            <div class="section-title">
-                                <div class="dot"></div>
-                                Manager Snapshots
-                            </div>
-                            <span class="section-sub">CLICK TO DRILL DOWN</span>
-                        </div>
-                        <div class="manager-grid" id="manager-grid"></div>
                         <div class="section-header">
                             <div class="section-title">
                                 <div class="dot"></div>
@@ -2676,232 +2635,9 @@
                     </div>
                 </div>
 
-                <!-- EMPLOYEES PAGE -->
-                <div class="page" id="page-employees">
-                    <div id="employees-empty" class="empty-state">
-                        <div class="empty-icon">
-                            <svg
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                stroke-width="1.5"
-                            >
-                                <circle cx="12" cy="7" r="4" />
-                                <path
-                                    d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"
-                                />
-                            </svg>
-                        </div>
-                        <div class="empty-title">No data loaded</div>
-                        <div class="empty-sub">
-                            Upload CSV data to view individual employee
-                            profiles.
-                        </div>
-                        <button class="btn-primary" onclick="openUpload()">
-                            Upload CSV
-                        </button>
-                    </div>
-                    <div id="employees-content" style="display: none">
-                        <div
-                            style="
-                                display: flex;
-                                align-items: center;
-                                gap: 12px;
-                                margin-bottom: 4px;
-                            "
-                        >
-                            <input
-                                class="search-input"
-                                type="text"
-                                placeholder="Search employees..."
-                                id="emp-search"
-                                oninput="renderEmployeeCards()"
-                            />
-                            <select
-                                class="filter-select"
-                                id="mgr-filter"
-                                onchange="renderEmployeeCards()"
-                            >
-                                <option value="all">All Managers</option>
-                            </select>
-                        </div>
-                        <div class="employee-grid" id="employee-grid"></div>
-                    </div>
-                    <div id="employee-detail">
-                        <div style="margin-bottom: 16px">
-                            <button
-                                class="back-btn"
-                                onclick="backToEmployees()"
-                            >
-                                <svg
-                                    width="12"
-                                    height="12"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    stroke-width="2.5"
-                                >
-                                    <polyline points="15 18 9 12 15 6" />
-                                </svg>
-                                Back to Employees
-                            </button>
-                        </div>
-                        <div class="detail-header" id="emp-detail-header"></div>
-                        <div class="kpi-grid" id="emp-detail-kpis"></div>
-                        <div class="chart-grid">
-                            <div class="chart-card">
-                                <div class="chart-card-header">
-                                    <div class="chart-card-title">
-                                        PPH Over Time
-                                    </div>
-                                </div>
-                                <div style="position: relative; height: 200px">
-                                    <canvas
-                                        id="emp-pph-chart"
-                                        role="img"
-                                        aria-label="Employee PPH over time"
-                                        >PPH history</canvas
-                                    >
-                                </div>
-                            </div>
-                            <div class="chart-card">
-                                <div class="chart-card-header">
-                                    <div class="chart-card-title">
-                                        Hours Breakdown
-                                    </div>
-                                </div>
-                                <div style="position: relative; height: 200px">
-                                    <canvas
-                                        id="emp-hours-chart"
-                                        role="img"
-                                        aria-label="Employee hours breakdown"
-                                        >Hours breakdown</canvas
-                                    >
-                                </div>
-                            </div>
-                        </div>
-                        <div class="data-table-wrap">
-                            <table class="data-table" id="emp-history-table">
-                                <thead>
-                                    <tr>
-                                        <th>Date</th>
-                                        <th>PPH</th>
-                                        <th>GAP%</th>
-                                        <th>Direct Hrs</th>
-                                        <th>Indirect Hrs</th>
-                                        <th>Total Hrs</th>
-                                        <th>Points</th>
-                                        <th>DoD PPH Δ</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="emp-history-body"></tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
+                <!-- Employee card grid page removed (Item 4).
+                     Employee detail is now a modal overlay — see #employee-detail-overlay below. -->
 
-                <!-- TRENDS PAGE -->
-                <div class="page" id="page-trends">
-                    <div id="trends-empty" class="empty-state">
-                        <div class="empty-icon">
-                            <svg
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                stroke-width="1.5"
-                            >
-                                <polyline
-                                    points="22 12 18 12 15 21 9 3 6 12 2 12"
-                                />
-                            </svg>
-                        </div>
-                        <div class="empty-title">
-                            Need multiple days of data
-                        </div>
-                        <div class="empty-sub">
-                            Upload at least two days of CSV data to start seeing
-                            trends and day-over-day analysis.
-                        </div>
-                        <button class="btn-primary" onclick="openUpload()">
-                            Upload CSV
-                        </button>
-                    </div>
-                    <div id="trends-content" style="display: none">
-                        <div class="insights-grid" id="insights-grid"></div>
-                        <div class="chart-grid">
-                            <div class="chart-card">
-                                <div class="chart-card-header">
-                                    <div class="chart-card-title">
-                                        Department PPH — Daily
-                                    </div>
-                                </div>
-                                <div style="position: relative; height: 240px">
-                                    <canvas
-                                        id="chart-dept-pph"
-                                        role="img"
-                                        aria-label="Department PPH daily trend"
-                                        >Department PPH</canvas
-                                    >
-                                </div>
-                            </div>
-                            <div class="chart-card">
-                                <div class="chart-card-header">
-                                    <div class="chart-card-title">
-                                        GAP% — Daily Trend
-                                    </div>
-                                </div>
-                                <div style="position: relative; height: 240px">
-                                    <canvas
-                                        id="chart-gap-trend"
-                                        role="img"
-                                        aria-label="GAP percent daily trend"
-                                        >GAP trend</canvas
-                                    >
-                                </div>
-                            </div>
-                        </div>
-                        <div class="chart-card" style="margin-bottom: 20px">
-                            <div class="chart-card-header">
-                                <div class="chart-card-title">
-                                    Manager PPH Comparison — Over Time
-                                </div>
-                            </div>
-                            <div style="position: relative; height: 260px">
-                                <canvas
-                                    id="chart-mgr-pph-multi"
-                                    role="img"
-                                    aria-label="Manager PPH over multiple days"
-                                    >Manager PPH comparison</canvas
-                                >
-                            </div>
-                        </div>
-                        <div class="section-header">
-                            <div class="section-title">
-                                <div class="dot"></div>
-                                Flagged Employees
-                            </div>
-                            <span class="section-sub"
-                                >CONSISTENT DECLINE OR MAJOR SWINGS</span
-                            >
-                        </div>
-                        <div class="data-table-wrap">
-                            <table class="data-table" id="flagged-table">
-                                <thead>
-                                    <tr>
-                                        <th>Employee</th>
-                                        <th>Manager</th>
-                                        <th>Pattern</th>
-                                        <th>Days Observed</th>
-                                        <th>Peak PPH</th>
-                                        <th>Latest PPH</th>
-                                        <th>Δ From Peak</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="flagged-body"></tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
 
                 <!-- CYCLE TIME PAGE -->
                 <div class="page" id="page-cycletime">
@@ -3289,6 +3025,15 @@
                         </div>
                         <button onclick="openInviteMgrModal()" style="padding:0.5rem 1rem; background:var(--accent-green,#4ade80); color:#0d1117; border:none; border-radius:6px; font-weight:600; font-size:0.85rem; cursor:pointer;">+ Add Manager</button>
                     </div>
+                    <!-- Shifts panel — GM creates/manages shifts; OMs see which shift they belong to -->
+                    <div id="shifts-section" style="margin-bottom:1.5rem;">
+                        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.75rem;">
+                            <div style="font-size:0.9rem; font-weight:600; color:var(--text-primary);">Shifts</div>
+                            <button id="add-shift-btn" onclick="openAddShiftModal()" style="padding:0.35rem 0.75rem; background:var(--surface-2,#1e2430); color:var(--text-primary); border:1px solid var(--border); border-radius:6px; font-size:0.8rem; cursor:pointer; display:none;">+ Add Shift</button>
+                        </div>
+                        <div id="shifts-panel-chips" style="display:flex; flex-wrap:wrap; gap:6px; min-height:28px;"></div>
+                    </div>
+
                     <div id="users-loading" style="color:var(--text-muted); font-size:0.9rem; padding:1rem 0;">Loading users…</div>
                     <div id="users-table-wrap" style="display:none; overflow-x:auto;">
                         <table style="width:100%; border-collapse:collapse; font-size:0.875rem;">
@@ -3296,6 +3041,7 @@
                                 <tr style="border-bottom:1px solid var(--border); color:var(--text-muted); text-align:left;">
                                     <th style="padding:8px 12px; font-weight:500;">Email</th>
                                     <th style="padding:8px 12px; font-weight:500;">Current Role</th>
+                                    <th style="padding:8px 12px; font-weight:500;">Shift / Team</th>
                                     <th style="padding:8px 12px; font-weight:500;">Actions</th>
                                 </tr>
                             </thead>
@@ -3304,6 +3050,96 @@
                     </div>
                 </div>
 
+            </div>
+        </div>
+
+        <!-- EMPLOYEE DETAIL MODAL (Item 4)
+             Replaces the former page-employees full-page view.
+             Opened via showEmployeeDetail(); closed via backToEmployees(). -->
+        <div id="employee-detail-overlay" style="
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.65);
+            z-index: 200;
+            overflow-y: auto;
+        " onclick="if(event.target===this) backToEmployees()">
+            <div style="
+                max-width: 1080px;
+                margin: 24px auto;
+                padding: 0 16px 40px;
+            ">
+                <div id="employee-detail">
+                    <div style="margin-bottom: 16px">
+                        <button
+                            class="back-btn"
+                            onclick="backToEmployees()"
+                        >
+                            <svg
+                                width="12"
+                                height="12"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2.5"
+                            >
+                                <polyline points="15 18 9 12 15 6" />
+                            </svg>
+                            Back to Manager View
+                        </button>
+                    </div>
+                    <div class="detail-header" id="emp-detail-header"></div>
+                    <div class="kpi-grid" id="emp-detail-kpis"></div>
+                    <div class="chart-grid">
+                        <div class="chart-card">
+                            <div class="chart-card-header">
+                                <div class="chart-card-title">
+                                    PPH Over Time
+                                </div>
+                            </div>
+                            <div style="position: relative; height: 200px">
+                                <canvas
+                                    id="emp-pph-chart"
+                                    role="img"
+                                    aria-label="Employee PPH over time"
+                                    >PPH history</canvas
+                                >
+                            </div>
+                        </div>
+                        <div class="chart-card">
+                            <div class="chart-card-header">
+                                <div class="chart-card-title">
+                                    Hours Breakdown
+                                </div>
+                            </div>
+                            <div style="position: relative; height: 200px">
+                                <canvas
+                                    id="emp-hours-chart"
+                                    role="img"
+                                    aria-label="Employee hours breakdown"
+                                    >Hours breakdown</canvas
+                                >
+                            </div>
+                        </div>
+                    </div>
+                    <div class="data-table-wrap">
+                        <table class="data-table" id="emp-history-table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>PPH</th>
+                                    <th>GAP%</th>
+                                    <th>Direct Hrs</th>
+                                    <th>Indirect Hrs</th>
+                                    <th>Total Hrs</th>
+                                    <th>Points</th>
+                                    <th>DoD PPH Δ</th>
+                                </tr>
+                            </thead>
+                            <tbody id="emp-history-body"></tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -3606,6 +3442,8 @@
             let currentUserRole = "manager"; // 'admin' | 'general_manager' | 'ops_manager' | 'area_manager' | 'manager' | 'ct'
             let currentUserSupervisor = null; // matched full supervisor name from data, null for admin/OM/GM
             let selectedManagerFilter = "all"; // supervisor name or "all" — OM/GM manager filter dropdown
+            // null = not an OM | [] = OM with no team assignments | string[] = assigned supervisor name strings
+            let currentUserAssignedSupervisors = null;
             let currentCTName = ""; // full name of CT user from certifiedTrainers doc
             // Tracks whether the user was ever signed in during this session.
             // Used in onAuthStateChanged to distinguish a sign-out transition
@@ -3761,6 +3599,11 @@
                         currentUserRole = orgRole;
                         currentUserSupervisor = null;
                         clearManagerMatchWarning();
+                        // OM scoping: load the supervisor names this OM is responsible for.
+                        // null stays null for GM (unrestricted); OM gets [] or a populated array.
+                        if (orgRole === "ops_manager") {
+                            currentUserAssignedSupervisors = orgRoleDoc.data().assignedSupervisors || [];
+                        }
                         // Fall through to shared UI updates below
                     } else if (orgRole === "area_manager") {
                         // Area manager: elevated label but scoped to own supervisor like a regular manager
@@ -3862,17 +3705,23 @@
                     locFilter.style.display =
                         (currentUserRole === "manager" || currentUserRole === "area_manager") ? "none" : "";
 
-                // History tab — admin and GM only
-                const historyNavItem = document.querySelector('[data-label="Data History"]');
-                if (historyNavItem)
-                    historyNavItem.style.display =
-                        (currentUserRole === "admin" || currentUserRole === "general_manager") ? "" : "none";
+                // Manage Data button in sidebar footer — admin and GM only
+                // (History tab removed from nav; access is now via this sidebar footer button)
+                const manageDataBtn = document.getElementById("manage-data-btn");
+                if (manageDataBtn)
+                    manageDataBtn.style.display =
+                        (currentUserRole === "admin" || currentUserRole === "general_manager") ? "flex" : "none";
 
                 // User Roles tab — GM only
                 const usersNavItem = document.querySelector('[data-label="User Roles"]');
                 if (usersNavItem)
                     usersNavItem.style.display =
                         currentUserRole === "general_manager" ? "" : "none";
+
+                // Add Shift button — GM only (shown inside #page-users shifts panel)
+                const addShiftBtn = document.getElementById("add-shift-btn");
+                if (addShiftBtn)
+                    addShiftBtn.style.display = currentUserRole === "general_manager" ? "" : "none";
             }
 
             // Maps Firebase auth error codes to plain-English messages.
@@ -3907,18 +3756,29 @@
             function updateManagerFilter() {
                 const sel = document.getElementById("manager-filter");
                 if (!sel) return;
-                const isOrgRole = currentUserRole === "ops_manager" || currentUserRole === "general_manager";
+                const isOM = currentUserRole === "ops_manager";
+                const isGM = currentUserRole === "general_manager";
+                const isOrgRole = isOM || isGM;
                 sel.style.display = isOrgRole ? "" : "none";
                 if (!isOrgRole) return;
                 const current = sel.value;
-                const sups = [...new Set(allDays.flatMap(d => d.rows).map(r => r["SUPERVISOR"]).filter(Boolean))].sort();
+                // OM: populate dropdown from their assigned supervisors list so they
+                // can only filter within their own scope, not the full org.
+                // GM: derive from all loaded data (unrestricted view).
+                let sups;
+                if (isOM && currentUserAssignedSupervisors !== null) {
+                    sups = currentUserAssignedSupervisors.filter(Boolean).sort();
+                } else {
+                    sups = [...new Set(allDays.flatMap(d => d.rows).map(r => r["SUPERVISOR"]).filter(Boolean))].sort();
+                }
                 sel.innerHTML = '<option value="all">All Managers</option>' +
                     sups.map(s => `<option value="${s}">${s}</option>`).join("");
                 if (sups.includes(current)) sel.value = current;
             }
 
             function applyManagerFilter() {
-                selectedManagerFilter = document.getElementById("manager-filter").value;
+                const sel = document.getElementById("manager-filter");
+                selectedManagerFilter = sel ? sel.value : "all";
                 applyFilters();
             }
 
@@ -3932,15 +3792,22 @@
                 tableWrap.style.display = "none";
 
                 try {
-                    const [usersSnap, rolesSnap, adminsSnap] = await Promise.all([
+                    // Fetch users, roles, admins, and shifts in parallel.
+                    const [usersSnap, rolesSnap, adminsSnap, shiftsSnap] = await Promise.all([
                         db.collection("users").get(),
                         db.collection("roles").get(),
-                        db.collection("admins").get()
+                        db.collection("admins").get(),
+                        db.collection("shifts").get()
                     ]);
+
                     const roleMap = {};
                     rolesSnap.forEach(d => { roleMap[d.id] = d.data().role; });
                     const adminSet = new Set();
                     adminsSnap.forEach(d => adminSet.add(d.id));
+
+                    // Full roles data (includes shiftId, assignedManagers, assignedTo, etc.)
+                    const omRolesData = {};
+                    rolesSnap.forEach(d => { omRolesData[d.id] = d.data(); });
 
                     // Merge users registry + anyone already in roles (in case they were
                     // manually assigned via console before logging in post-deployment).
@@ -3949,12 +3816,50 @@
                     rolesSnap.forEach(d => { if (!userMap[d.id]) userMap[d.id] = d.id; });
                     adminsSnap.forEach(d => { if (!userMap[d.id]) userMap[d.id] = d.id; });
 
+                    // shiftMap: shiftId → shift name (for OM shift selector)
+                    const shiftMap = {};
+                    shiftsSnap.forEach(d => { shiftMap[d.id] = d.data().name; });
+
+                    // Render the shifts panel chips above the table
+                    renderShiftsPanel(shiftMap);
+
                     const rolePill = (uid) => {
                         if (adminSet.has(uid)) return `<span style="background:var(--accent-purple-dim,#3b2f5e);color:var(--accent-purple,#a78bfa);padding:2px 8px;border-radius:99px;font-size:0.75rem;">Admin</span>`;
                         if (roleMap[uid] === "general_manager") return `<span style="background:var(--accent-amber-dim,#3d2f1a);color:var(--accent-amber,#f59e0b);padding:2px 8px;border-radius:99px;font-size:0.75rem;">General Manager</span>`;
                         if (roleMap[uid] === "ops_manager") return `<span style="background:var(--accent-cyan-dim,#0e2f38);color:var(--accent-cyan,#22d3ee);padding:2px 8px;border-radius:99px;font-size:0.75rem;">Ops Manager</span>`;
                         if (roleMap[uid] === "area_manager") return `<span style="background:var(--accent-green-dim,#0e2f1e);color:var(--accent-green,#4ade80);padding:2px 8px;border-radius:99px;font-size:0.75rem;">Area Manager</span>`;
                         return `<span style="background:var(--bg-hover,#2a2a2a);color:var(--text-muted);padding:2px 8px;border-radius:99px;font-size:0.75rem;">Manager</span>`;
+                    };
+
+                    // Shift/Team column cell:
+                    // - Admin or GM rows: em dash (no shift assignment UI)
+                    // - OM rows: shift selector dropdown
+                    // - AM/manager rows: show which OM they're assigned to (→ FirstName) or em dash
+                    const shiftTeamCell = (uid) => {
+                        if (adminSet.has(uid) || roleMap[uid] === "general_manager") {
+                            return `<td style="padding:8px 12px; color:var(--text-muted);">—</td>`;
+                        }
+                        if (roleMap[uid] === "ops_manager") {
+                            const currentShift = omRolesData[uid]?.shiftId || "";
+                            const options = Object.entries(shiftMap)
+                                .map(([id, name]) => `<option value="${id}" ${currentShift === id ? "selected" : ""}>${name}</option>`)
+                                .join("");
+                            return `<td style="padding:8px 12px;">
+                                <select onchange="assignOMShift('${uid}', this.value)"
+                                    style="padding:3px 8px;background:var(--surface-2,#1e2430);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);font-size:0.8rem;cursor:pointer;">
+                                    <option value="" ${!currentShift ? "selected" : ""}>No Shift</option>
+                                    ${options}
+                                </select>
+                            </td>`;
+                        }
+                        // AM / manager: show which OM they're assigned to
+                        const assignedToUid = omRolesData[uid]?.assignedTo;
+                        if (assignedToUid) {
+                            const omEmail = userMap[assignedToUid] || assignedToUid;
+                            const omFirst = firstNameFromEmail(omEmail);
+                            return `<td style="padding:8px 12px; color:var(--text-secondary); font-size:0.85rem;">&#8594; ${omFirst.charAt(0).toUpperCase() + omFirst.slice(1)}</td>`;
+                        }
+                        return `<td style="padding:8px 12px; color:var(--text-muted);">—</td>`;
                     };
 
                     const actionBtns = (uid, email) => {
@@ -3970,11 +3875,16 @@
                                 style="padding:3px 10px;border-radius:6px;border:1px solid var(--border);background:${active?`var(${colorDim})`:"var(--bg-card)"};color:${active?`var(${color})`:"var(--text-muted)"};cursor:${active?"default":"pointer"};font-size:0.8rem;margin-right:4px;">
                                 ${label}
                             </button>`;
+                        // "Manage Team" button — only shown for OM rows
+                        const manageTeamBtn = omActive
+                            ? `<button onclick="openAssignTeamModal('${safeUid}','${safeEmail}')" style="padding:3px 10px;border-radius:6px;border:1px solid var(--accent-cyan,#22d3ee);background:transparent;color:var(--accent-cyan,#22d3ee);cursor:pointer;font-size:0.8rem;margin-right:4px;">Manage Team</button>`
+                            : "";
                         return `<div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;">
                             ${assignBtn("Area Manager",    "area_manager",    amActive, "--accent-green,#4ade80", "--accent-green-dim,#0e2f1e")}
                             ${assignBtn("Ops Manager",     "ops_manager",     omActive, "--accent-cyan,#22d3ee",  "--accent-cyan-dim,#0e2f38")}
                             ${assignBtn("General Manager", "general_manager", gmActive, "--accent-amber,#f59e0b", "--accent-amber-dim,#3d2f1a")}
                             ${hasRole ? `<button onclick="removeRole('${safeUid}')" style="padding:3px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg-card);color:var(--text-muted);cursor:pointer;font-size:0.8rem;margin-right:4px;">Remove Role</button>` : ""}
+                            ${manageTeamBtn}
                             <button onclick="openRevokeMgrModal('${safeUid}','${safeEmail}','remove')" style="padding:3px 10px;border-radius:6px;border:1px solid var(--accent-red,#f87171);background:transparent;color:var(--accent-red,#f87171);cursor:pointer;font-size:0.8rem;margin-right:4px;">Revoke</button>
                             <button onclick="openRevokeMgrModal('${safeUid}','${safeEmail}','delete')" style="padding:3px 10px;border-radius:6px;border:1px solid var(--accent-red,#f87171);background:var(--accent-red-dim);color:var(--accent-red,#f87171);cursor:pointer;font-size:0.8rem;">Delete</button>
                         </div>`;
@@ -3985,9 +3895,10 @@
                         `<tr style="border-bottom:1px solid var(--border);">
                             <td style="padding:10px 12px;color:var(--text-primary);">${email}</td>
                             <td style="padding:10px 12px;">${rolePill(uid)}</td>
+                            ${shiftTeamCell(uid)}
                             <td style="padding:10px 12px;">${actionBtns(uid, email)}</td>
                         </tr>`
-                    ).join("") || `<tr><td colspan="3" style="padding:16px;color:var(--text-muted);text-align:center;">No users found.</td></tr>`;
+                    ).join("") || `<tr><td colspan="4" style="padding:16px;color:var(--text-muted);text-align:center;">No users found.</td></tr>`;
 
                     loadingEl.style.display = "none";
                     tableWrap.style.display = "block";
@@ -4019,6 +3930,220 @@
                 } catch (e) {
                     alert("Failed to remove role. Check your permissions.");
                     console.error("removeRole error:", e);
+                }
+            }
+
+            // ── Shifts management functions ───────────────────────────────────────────
+
+            // Render the shift chips panel above the users table.
+            // Shows existing shifts as pills; GM chips have a delete button.
+            function renderShiftsPanel(shiftMap) {
+                const panel = document.getElementById("shifts-panel-chips");
+                if (!panel) return;
+                const isGM = currentUserRole === "general_manager";
+                const entries = Object.entries(shiftMap);
+                if (entries.length === 0) {
+                    panel.innerHTML = isGM
+                        ? '<span style="color:var(--text-muted); font-size:0.8rem;">No shifts yet. Add one above.</span>'
+                        : '<span style="color:var(--text-muted); font-size:0.8rem;">No shifts defined.</span>';
+                    return;
+                }
+                panel.innerHTML = entries.map(([id, name]) =>
+                    `<span style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;background:var(--surface-2,#1e2430);border:1px solid var(--border);border-radius:999px;font-size:0.8rem;color:var(--text-primary);">
+                        ${name}
+                        ${isGM ? `<button onclick="deleteShift('${id}','${name.replace(/'/g,"\\'")}')" style="background:none;border:none;color:var(--text-muted);cursor:pointer;padding:0;font-size:0.9rem;line-height:1;" title="Delete shift">&#x00D7;</button>` : ''}
+                    </span>`
+                ).join(" ");
+            }
+
+            // Open the Add Shift modal and focus the input
+            function openAddShiftModal() {
+                document.getElementById("add-shift-input").value = "";
+                document.getElementById("add-shift-overlay").style.display = "flex";
+                setTimeout(() => document.getElementById("add-shift-input").focus(), 50);
+            }
+
+            // Create a new shift document in Firestore, then re-render the page
+            async function createShift() {
+                const input = document.getElementById("add-shift-input");
+                const name = (input.value || "").trim();
+                if (!name) return;
+                try {
+                    await db.collection("shifts").add({
+                        name,
+                        createdBy: currentUser.uid,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    document.getElementById("add-shift-overlay").style.display = "none";
+                    renderUsersPage();
+                } catch(e) {
+                    console.error("createShift error:", e);
+                }
+            }
+
+            // Delete a shift and clear its shiftId from any OM roles docs that reference it.
+            // Uses client-side filtering to avoid requiring a Firestore composite index.
+            async function deleteShift(shiftId, name) {
+                if (!confirm(`Delete shift "${name}"? OMs assigned to this shift will be unassigned.`)) return;
+                try {
+                    await db.collection("shifts").doc(shiftId).delete();
+                    // Fetch all roles docs and filter client-side (no index required)
+                    const rolesSnap = await db.collection("roles").get();
+                    const batch = db.batch();
+                    rolesSnap.forEach(d => {
+                        if (d.data().shiftId === shiftId)
+                            batch.update(d.ref, { shiftId: firebase.firestore.FieldValue.delete() });
+                    });
+                    if (!rolesSnap.empty) await batch.commit();
+                    renderUsersPage();
+                } catch(e) {
+                    console.error("deleteShift error:", e);
+                }
+            }
+
+            // Assign (or clear) a shift for an OM by writing shiftId to their roles doc.
+            // No full re-render needed — the select's displayed value updates immediately via browser.
+            async function assignOMShift(omUid, shiftId) {
+                try {
+                    const update = shiftId
+                        ? { shiftId }
+                        : { shiftId: firebase.firestore.FieldValue.delete() };
+                    await db.collection("roles").doc(omUid).set(update, { merge: true });
+                } catch(e) {
+                    console.error("assignOMShift error:", e);
+                }
+            }
+
+            // ── Assign Team modal ─────────────────────────────────────────────────────
+
+            // Tracks the OM uid currently open in the assign-team overlay
+            let _assignTeamOMUid = null;
+
+            // Open the Manage Team modal for a given OM, re-fetching fresh data
+            async function openAssignTeamModal(omUid, omEmail) {
+                _assignTeamOMUid = omUid;
+                document.getElementById("assign-team-title").textContent = "Manage Team";
+                document.getElementById("assign-team-subtitle").textContent = omEmail;
+                document.getElementById("assign-team-list").innerHTML =
+                    '<div style="color:var(--text-muted);font-size:0.85rem;padding:0.5rem;">Loading…</div>';
+                document.getElementById("assign-team-overlay").style.display = "flex";
+
+                try {
+                    const [usersSnap, rolesSnap, adminsSnap] = await Promise.all([
+                        db.collection("users").get(),
+                        db.collection("roles").get(),
+                        db.collection("admins").get()
+                    ]);
+                    const adminSet = new Set();
+                    adminsSnap.forEach(d => adminSet.add(d.id));
+                    const roleMap = {};
+                    rolesSnap.forEach(d => { roleMap[d.id] = d.data(); });
+                    const userMap = {};
+                    usersSnap.forEach(d => { userMap[d.id] = d.data().email || d.id; });
+                    rolesSnap.forEach(d => { if (!userMap[d.id]) userMap[d.id] = d.id; });
+
+                    // Current manager UIDs assigned to this OM
+                    const currentAssigned = new Set(roleMap[omUid]?.assignedManagers || []);
+
+                    // Build checklist: all non-admin, non-GM, non-OM users (managers and AMs)
+                    const listItems = Object.entries(userMap)
+                        .filter(([uid]) => {
+                            if (adminSet.has(uid)) return false;
+                            const r = roleMap[uid]?.role;
+                            if (r === "general_manager" || r === "ops_manager") return false;
+                            if (uid === omUid) return false;
+                            return true;
+                        })
+                        .sort(([,a],[,b]) => a.localeCompare(b))
+                        .map(([uid, email]) => {
+                            const assignedToUid = roleMap[uid]?.assignedTo;
+                            const takenByOther = assignedToUid && assignedToUid !== omUid;
+                            const assignedToEmail = takenByOther ? (userMap[assignedToUid] || assignedToUid) : null;
+                            const assignedNote = takenByOther
+                                ? ` <span style="color:var(--text-muted);font-size:0.75rem;">— assigned to ${firstNameFromEmail(assignedToEmail || assignedToUid)}</span>`
+                                : "";
+                            const checked = currentAssigned.has(uid) ? "checked" : "";
+                            const disabled = takenByOther ? "disabled" : "";
+                            const labelStyle = takenByOther
+                                ? "display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:4px;cursor:not-allowed;color:var(--text-muted);font-size:0.85rem;opacity:0.55;"
+                                : "display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:4px;cursor:pointer;color:var(--text-primary);font-size:0.85rem;";
+                            const hover = takenByOther ? "" : `onmouseover="this.style.background='var(--surface-2,#1e2430)'" onmouseout="this.style.background=''"`;
+                            return `<label style="${labelStyle}" ${hover}>
+                                <input type="checkbox" data-uid="${uid}" ${checked} ${disabled} style="accent-color:var(--accent-green,#4ade80);">
+                                ${email}${assignedNote}
+                            </label>`;
+                        });
+
+                    document.getElementById("assign-team-list").innerHTML = listItems.length
+                        ? listItems.join("")
+                        : '<div style="color:var(--text-muted);font-size:0.85rem;padding:0.5rem;">No managers found.</div>';
+                } catch(e) {
+                    console.error("openAssignTeamModal error:", e);
+                    document.getElementById("assign-team-list").innerHTML =
+                        '<div style="color:#f87171;font-size:0.85rem;padding:0.5rem;">Failed to load users.</div>';
+                }
+            }
+
+            // Save the checked manager UIDs as this OM's team.
+            // Also writes assignedTo on each selected manager's roles doc,
+            // and clears assignedTo for any previously-assigned managers that were unchecked.
+            async function saveOMTeamAssignment() {
+                const omUid = _assignTeamOMUid;
+                if (!omUid) return;
+
+                const checkboxes = document.querySelectorAll("#assign-team-list input[type=checkbox]");
+                const selectedUIDs = [...checkboxes].filter(c => c.checked).map(c => c.dataset.uid);
+
+                const saveBtn = document.getElementById("assign-team-save-btn");
+                saveBtn.textContent = "Saving…";
+                saveBtn.disabled = true;
+
+                try {
+                    // Fetch user emails to derive supervisor names from email addresses
+                    const usersSnap = await db.collection("users").get();
+                    const userEmailMap = {};
+                    usersSnap.forEach(d => { userEmailMap[d.id] = d.data().email || ""; });
+
+                    // Fetch existing assignments to find which managers were removed
+                    const omRolesDoc = await db.collection("roles").doc(omUid).get();
+                    const previousUIDs = omRolesDoc.exists ? (omRolesDoc.data().assignedManagers || []) : [];
+                    const removedUIDs = previousUIDs.filter(uid => !selectedUIDs.includes(uid));
+
+                    // Derive supervisor name strings from email addresses.
+                    // matchSupervisorFromEmail returns {name, status}; fall back to firstNameFromEmail.
+                    const assignedSupervisors = selectedUIDs.map(uid => {
+                        const email = userEmailMap[uid] || uid;
+                        const result = matchSupervisorFromEmail(email);
+                        return result.name || firstNameFromEmail(email);
+                    }).filter(Boolean);
+
+                    // Write the OM's roles doc with updated team arrays
+                    await db.collection("roles").doc(omUid).set({
+                        assignedManagers: selectedUIDs,
+                        assignedSupervisors
+                    }, { merge: true });
+
+                    // Update assignedTo for newly-selected managers and clear it for removed ones
+                    const writes = selectedUIDs.map(uid =>
+                        db.collection("roles").doc(uid).set({ assignedTo: omUid }, { merge: true })
+                    );
+                    removedUIDs.forEach(uid => {
+                        writes.push(
+                            db.collection("roles").doc(uid).set(
+                                { assignedTo: firebase.firestore.FieldValue.delete() },
+                                { merge: true }
+                            )
+                        );
+                    });
+                    await Promise.all(writes);
+
+                    document.getElementById("assign-team-overlay").style.display = "none";
+                    renderUsersPage();
+                } catch(e) {
+                    console.error("saveOMTeamAssignment error:", e);
+                } finally {
+                    saveBtn.textContent = "Save";
+                    saveBtn.disabled = false;
                 }
             }
 
@@ -4242,28 +4367,6 @@
             // ══════════════════════════════════════════
             // FIRESTORE — PERFORMANCE DATA
             // ══════════════════════════════════════════
-            async function saveData() {
-                if (!currentUser) return;
-                const CHUNK = 400;
-                for (let i = 0; i < allDays.length; i += CHUNK) {
-                    const batch = db.batch();
-                    for (const day of allDays.slice(i, i + CHUNK)) {
-                        const ref = db
-                            .collection("performanceDays")
-                            .doc(day.date);
-                        batch.set(ref, {
-                            date: day.date,
-                            filename: day.filename || "",
-                            rows: day.rows,
-                        });
-                    }
-                    try {
-                        await batch.commit();
-                    } catch (e) {
-                        console.error("saveData error:", e);
-                    }
-                }
-            }
 
             // ── In-memory cache to avoid re-fetching already loaded dates ──
             const perfCache = new Set(); // dates already loaded into allDays
@@ -4342,13 +4445,18 @@
                     let rows = snap.docs.flatMap(doc => doc.data().rows || []);
 
                     // Apply location filter
-                    const loc = document.getElementById("location-filter").value;
+                    const loc = document.getElementById("location-filter")?.value ?? "all";
                     if (loc !== "all") rows = rows.filter(r => r.LOCATION === loc);
 
                     // Apply manager filter (area_manager is also supervisor-scoped)
                     if (currentUserRole === "manager" || currentUserRole === "area_manager") {
                         rows = currentUserSupervisor
                             ? rows.filter(r => r["SUPERVISOR"] === currentUserSupervisor)
+                            : [];
+                    } else if (currentUserRole === "ops_manager") {
+                        // Scope OM prior-week data to their assigned team
+                        rows = (currentUserAssignedSupervisors && currentUserAssignedSupervisors.length > 0)
+                            ? rows.filter(r => currentUserAssignedSupervisors.includes(r["SUPERVISOR"]))
                             : [];
                     }
 
@@ -4485,7 +4593,6 @@
                     renderPPHTrendChart();
                     renderHoursDonut(getFilteredRows());
                 } else if (page === "managers") renderManagers();
-                else if (page === "trends") renderTrends();
                 else if (page === "cycletime") renderCycleTime();
             }
 
@@ -4590,7 +4697,7 @@
                             return;
                         }
 
-                        // Group assignments by managerId so cards are section-labeled by manager
+                        // Group assignments by managerId
                         const byManager = {};
                         for (const c of coachings) {
                             if (!byManager[c.managerId]) byManager[c.managerId] = { name: c.managerName, items: [] };
@@ -4601,13 +4708,27 @@
                             <div class="coaching-manager-section">
                                 <div class="coaching-manager-header">${group.name || "Manager"}</div>
                                 <div class="coaching-cards-grid">
-                                    ${group.items.map(c => `
-                                        <div class="coaching-emp-card status-${c.status || 'assigned'}"
-                                             onclick="showCTEmployeePage('${c.id}', '${c.employeeName.replace(/'/g,"\\'")}')">
-                                            <div class="coaching-emp-name">${c.employeeName}</div>
-                                            <div class="coaching-emp-status">${c.status === 'locked' ? 'Locked' : c.status === 'submitted' ? 'Submitted' : 'Needs Coaching'}</div>
-                                        </div>
-                                    `).join("")}
+                                    ${group.items.map(c => {
+                                        const safeName = c.employeeName.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+                                        const isComplete  = c.status === "submitted" || c.status === "locked";
+                                        const isLocked    = c.status === "locked";
+                                        const isSubmitted = c.status === "submitted";
+                                        const statusBadge = isLocked
+                                            ? `<span class="ct-status-badge" style="background:var(--accent-green-dim);color:var(--accent-green)">LOCKED</span>`
+                                            : isSubmitted
+                                            ? `<span class="ct-status-badge" style="background:var(--accent-green-dim);color:var(--accent-green)">SUBMITTED</span>`
+                                            : `<span class="ct-status-badge" style="background:var(--accent-red-dim);color:var(--accent-red)">NEEDS COACHING</span>`;
+                                        return `<div class="ct-coaching-card" style="background:${isComplete ? "var(--accent-green-dim)" : "var(--bg-surface)"};border:1px solid ${isComplete ? "rgba(63,185,80,0.4)" : "var(--border)"};"
+                                                     onclick="showCTEmployeePage('${c.id}', '${safeName}')">
+                                          <div style="display:flex;align-items:flex-start;gap:10px">
+                                            <div style="flex:1;min-width:0">
+                                              <div class="ct-card-name" style="color:${isComplete ? "var(--accent-green)" : "var(--text-primary)"}">${c.employeeName}</div>
+                                              <div class="ct-card-manager">${c.managerName || "Manager"}</div>
+                                            </div>
+                                            <div style="flex-shrink:0">${statusBadge}</div>
+                                          </div>
+                                        </div>`;
+                                    }).join("")}
                                 </div>
                             </div>
                         `).join("");
@@ -4618,8 +4739,7 @@
             }
 
             // Navigate into an employee detail view from the CT coaching assignments list.
-            // Fetches the last 30 days of performance data from Firestore directly
-            // (CT users skip loadData() so perfCache / allDays are always empty for them).
+            // Fetches performance data for the date range the manager had selected when they assigned the coaching.
             async function showCTEmployeePage(coachingId, employeeName) {
                 currentCTCoachingId = coachingId;
 
@@ -4631,16 +4751,32 @@
                 statsEl.innerHTML = `<div style="color:var(--text-muted); font-size:0.9rem;">Loading ${employeeName}'s stats…</div>`;
 
                 try {
-                    // Read last 30 performance day docs, filter to this employee's rows
-                    const snap = await db.collection("performanceDays").orderBy("date", "desc").limit(30).get();
+                    // Fetch the coaching doc to get the manager's date range snapshot
+                    const coachingDoc = await db.collection("coachings").doc(coachingId).get();
+                    const coachingData = coachingDoc.exists ? coachingDoc.data() : {};
+                    const dateFrom = coachingData.dateFrom || null;
+                    const dateTo   = coachingData.dateTo   || null;
+
+                    // Query performanceDays scoped to the stored date range, or fall back to last 30 docs
+                    let query = db.collection("performanceDays").orderBy("date", "desc");
+                    if (dateFrom && dateTo) {
+                        query = db.collection("performanceDays")
+                            .where("date", ">=", dateFrom)
+                            .where("date", "<=", dateTo)
+                            .orderBy("date", "desc");
+                    } else {
+                        query = query.limit(30);
+                    }
+                    const snap = await query.get();
                     const empRows = [];
                     for (const doc of snap.docs) {
                         const rows = (doc.data().rows || []).filter(r => r.EMPLOYEE === employeeName);
                         empRows.push(...rows);
                     }
+                    const rangeLabel = dateFrom && dateTo ? `${dateFrom} – ${dateTo}` : "last 30 days of available data";
 
                     if (!empRows.length) {
-                        statsEl.innerHTML = `<div style="color:var(--text-muted); font-size:0.9rem;">No performance data found for ${employeeName}.</div>`;
+                        statsEl.innerHTML = `<div style="color:var(--text-muted); font-size:0.9rem;">No performance data found for ${employeeName} in ${rangeLabel}.</div>`;
                         return;
                     }
 
@@ -4652,24 +4788,24 @@
                     statsEl.innerHTML = `
                         <div style="margin-bottom:1rem;">
                             <div style="font-size:1.1rem; font-weight:700; color:var(--text-primary); margin-bottom:0.25rem;">${employeeName}</div>
-                            <div style="font-size:0.8rem; color:var(--text-muted);">Last 30 days of available data</div>
+                            <div style="font-size:0.8rem; color:var(--text-muted);">${rangeLabel}</div>
                         </div>
-                        <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:10px; margin-bottom:1rem;">
-                            <div style="padding:0.75rem; background:var(--bg-card); border:1px solid var(--border); border-radius:8px;">
-                                <div style="font-size:0.7rem; text-transform:uppercase; color:var(--text-muted); letter-spacing:0.06em;">Avg PPH</div>
-                                <div style="font-size:1.4rem; font-weight:700; color:var(--accent-cyan); font-family:'JetBrains Mono',monospace;">${pph}</div>
+                        <div id="ct-stats-grid" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:10px; margin-bottom:1rem;">
+                            <div class="ct-stat-tile">
+                                <div class="ct-stat-label">Avg PPH</div>
+                                <div class="ct-stat-value" style="color:var(--accent-cyan)">${pph}</div>
                             </div>
-                            <div style="padding:0.75rem; background:var(--bg-card); border:1px solid var(--border); border-radius:8px;">
-                                <div style="font-size:0.7rem; text-transform:uppercase; color:var(--text-muted); letter-spacing:0.06em;">Avg GAP%</div>
-                                <div style="font-size:1.4rem; font-weight:700; color:var(--accent-amber); font-family:'JetBrains Mono',monospace;">${gap}%</div>
+                            <div class="ct-stat-tile">
+                                <div class="ct-stat-label">Avg GAP%</div>
+                                <div class="ct-stat-value" style="color:var(--accent-amber)">${gap}%</div>
                             </div>
-                            <div style="padding:0.75rem; background:var(--bg-card); border:1px solid var(--border); border-radius:8px;">
-                                <div style="font-size:0.7rem; text-transform:uppercase; color:var(--text-muted); letter-spacing:0.06em;">Direct Hours</div>
-                                <div style="font-size:1.4rem; font-weight:700; color:var(--accent-green); font-family:'JetBrains Mono',monospace;">${directH}h</div>
+                            <div class="ct-stat-tile">
+                                <div class="ct-stat-label">Direct Hours</div>
+                                <div class="ct-stat-value" style="color:var(--accent-green)">${directH}h</div>
                             </div>
-                            <div style="padding:0.75rem; background:var(--bg-card); border:1px solid var(--border); border-radius:8px;">
-                                <div style="font-size:0.7rem; text-transform:uppercase; color:var(--text-muted); letter-spacing:0.06em;">Total Hours</div>
-                                <div style="font-size:1.4rem; font-weight:700; color:var(--text-primary); font-family:'JetBrains Mono',monospace;">${totalH}h</div>
+                            <div class="ct-stat-tile">
+                                <div class="ct-stat-label">Total Hours</div>
+                                <div class="ct-stat-value" style="color:var(--text-primary)">${totalH}h</div>
                             </div>
                         </div>
                     `;
@@ -4706,22 +4842,12 @@
                 document.getElementById("page-title").textContent = {
                     dashboard: "Dashboard",
                     managers: "Managers",
-                    employees: "Employees",
-                    trends: "Trends",
                     history: "Data History",
                     cycletime: "Cycle Time",
                     coaching: "Coaching",
                     users: "User Roles",
-                }[name];
+                }[name] || name;
                 document.getElementById("breadcrumb").textContent = "/ " + name;
-                if (name !== "employees") {
-                    document.getElementById("employee-detail").style.display =
-                        "none";
-                    document.getElementById("employees-content").style.display =
-                        allDays.length ? "block" : "none";
-                    document.getElementById("employees-empty").style.display =
-                        allDays.length ? "none" : "block";
-                }
                 if (name === "coaching") {
                     // CT coaching page — real-time listener, no date range or data loading needed
                     renderCTCoachingPage();
@@ -4733,47 +4859,16 @@
                     loadCTData(from, to).then(() => renderCycleTime());
                 } else {
                     if (leavingCT) restoreFullDateRange();
-                    if (name === "trends") renderTrends();
                     if (name === "managers") renderManagers();
-                    if (name === "employees") renderEmployeeCards();
                     if (name === "history") renderHistory();
                     if (name === "users") renderUsersPage();
                 }
             }
 
-            // Navigate directly to an employee detail from any page
+            // Navigate directly to an employee detail from any page (Item 4)
+            // Employee detail is now a modal overlay — no page swap needed.
             function goToEmployee(name, source) {
                 empNavSource = source || "employees";
-                // Switch nav active state to employees
-                document
-                    .querySelectorAll(".page")
-                    .forEach((p) => p.classList.remove("active"));
-                document
-                    .querySelectorAll(".nav-item")
-                    .forEach((n) => n.classList.remove("active"));
-                document
-                    .getElementById("page-employees")
-                    .classList.add("active");
-                const empNavItem = document.querySelector(
-                    '[data-label="Employees"]',
-                );
-                if (empNavItem) empNavItem.classList.add("active");
-                document.getElementById("page-title").textContent = "Employees";
-                document.getElementById("breadcrumb").textContent =
-                    "/ employees";
-                // Hide card grid, show detail
-                document.getElementById("employees-content").style.display =
-                    "none";
-                document.getElementById("employees-empty").style.display =
-                    "none";
-                // Update back button label based on source
-                const backBtn = document.querySelector(
-                    "#employee-detail .back-btn",
-                );
-                if (backBtn) {
-                    backBtn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
-      ${empNavSource === "manager" ? "Back to Manager View" : "Back to Employees"}`;
-                }
                 showEmployeeDetail(name);
             }
 
@@ -4781,7 +4876,7 @@
             // FILTERS
             // ══════════════════════════════════════════
             function getFilteredRows() {
-                const loc = document.getElementById("location-filter").value;
+                const loc = document.getElementById("location-filter")?.value ?? "all";
                 const from = document.getElementById("date-from").value;
                 const to = document.getElementById("date-to").value;
 
@@ -4793,8 +4888,16 @@
                 if (loc !== "all")
                     rows = rows.filter((r) => r.LOCATION === loc);
 
-                // Org roles: filter by selected manager when one is chosen
-                if ((currentUserRole === "ops_manager" || currentUserRole === "general_manager") && selectedManagerFilter !== "all") {
+                // Org roles: scope OM to their assigned supervisors list; GM filters on explicit selection.
+                if (currentUserRole === "ops_manager") {
+                    if (currentUserAssignedSupervisors && currentUserAssignedSupervisors.length > 0) {
+                        rows = selectedManagerFilter !== "all"
+                            ? rows.filter(r => r["SUPERVISOR"] === selectedManagerFilter)
+                            : rows.filter(r => currentUserAssignedSupervisors.includes(r["SUPERVISOR"]));
+                    } else {
+                        rows = []; // OM with no team assigned sees nothing
+                    }
+                } else if (currentUserRole === "general_manager" && selectedManagerFilter !== "all") {
                     rows = rows.filter(r => r["SUPERVISOR"] === selectedManagerFilter);
                 }
 
@@ -5009,8 +5112,6 @@
                     renderAll();
                     const page = getActivePage();
                     if (page === "managers") renderManagers();
-                    else if (page === "employees") renderEmployeeCards();
-                    else if (page === "trends") renderTrends();
                     else if (page === "history") renderHistory();
                     else if (page === "cycletime") renderCycleTime();
                 });
@@ -5018,6 +5119,7 @@
 
             function updateLocationFilter() {
                 const sel = document.getElementById("location-filter");
+                if (!sel) { updateDateRange(); return; }
                 const current = sel.value;
                 const locs = [
                     ...new Set(
@@ -5525,7 +5627,6 @@
                     renderKPIs(rows);
                     renderPPHTrendChart();
                     renderHoursDonut(rows);
-                    renderManagerGrid(rows);
                     renderRankingTable(rows);
                 }
             }
@@ -5641,11 +5742,19 @@
                     }
 
                     let rows = day.rows;
-                    const loc = document.getElementById("location-filter").value;
+                    const loc = document.getElementById("location-filter")?.value ?? "all";
                     if (loc !== "all") rows = rows.filter(r => r.LOCATION === loc);
                     if ((currentUserRole === "manager" || currentUserRole === "area_manager") && currentUserSupervisor) {
                         rows = rows.filter(r => r["SUPERVISOR"] === currentUserSupervisor);
-                    } else if ((currentUserRole === "ops_manager" || currentUserRole === "general_manager") && selectedManagerFilter !== "all") {
+                    } else if (currentUserRole === "ops_manager") {
+                        if (currentUserAssignedSupervisors && currentUserAssignedSupervisors.length > 0) {
+                            rows = selectedManagerFilter !== "all"
+                                ? rows.filter(r => r["SUPERVISOR"] === selectedManagerFilter)
+                                : rows.filter(r => currentUserAssignedSupervisors.includes(r["SUPERVISOR"]));
+                        } else {
+                            rows = []; // OM with no team assigned sees nothing
+                        }
+                    } else if (currentUserRole === "general_manager" && selectedManagerFilter !== "all") {
                         rows = rows.filter(r => r["SUPERVISOR"] === selectedManagerFilter);
                     }
 
@@ -5862,79 +5971,7 @@
                 return valid.reduce((a, b) => a + b.avgCycle, 0) / valid.length;
             }
 
-            function renderManagerGrid(rows) {
-                const mgrs = getManagerStats(rows);
-                const grid = document.getElementById("manager-grid");
-                grid.innerHTML = mgrs
-                    .map((m, i) => {
-                        const trend = getManagerTrend(m.name);
-                        const trendLabel = {
-                            up: "↑ Trending Up",
-                            down: "↓ Declining",
-                            neutral: "→ Stable",
-                        }[trend];
-                        const color = [
-                            "var(--accent-cyan)",
-                            "var(--accent-green)",
-                            "var(--accent-amber)",
-                            "var(--accent-purple)",
-                        ][i % 4];
-
-                        // Compute top/bottom performer for this manager's team using the
-                        // same >50% direct hours qualification rule as the ranking table.
-                        const mgrRows = rows.filter((r) => r["SUPERVISOR"] === m.name);
-                        const { topName, bottomName } = getTopBottomPerformer(mgrRows);
-
-                        // Right card: "Team Spotlight" with top/bottom performer names.
-                        // Only rendered when at least one qualifying employee exists.
-                        const performersCard = topName
-                            ? `<div class="mgr-performers-card">
-        <div class="mgr-performers-label">Team Spotlight</div>
-        <div class="mgr-performers-lines">
-          <span class="perf-highlight top">▲ Top: ${topName}</span>
-          ${bottomName ? `<span class="perf-highlight bottom">▼ Bottom: ${bottomName}</span>` : ""}
-        </div>
-      </div>`
-                            : "";
-
-                        // Each manager renders as a pair: snapshot card (left) + performers card (right).
-                        // The .mgr-pair container uses flex so the right card sits beside the snapshot.
-                        return `<div class="mgr-pair">
-      <div class="manager-card" onclick="drillManager('${m.name.replace(/'/g, "\\'")}')">
-        <div class="manager-card-header">
-          <div class="manager-info">
-            <div class="manager-avatar" style="background:${color}22;color:${color}">${getInitials(m.name)}</div>
-            <div>
-              <div class="manager-name">${m.name}</div>
-              <div class="manager-meta">${m.count} employees · ${m.location || "N/A"}</div>
-            </div>
-          </div>
-          <span class="trend-pill ${trend}">${trendLabel}</span>
-        </div>
-        <div class="manager-kpis" style="grid-template-columns:repeat(5,1fr)">
-          <div><div class="mgr-kpi-label">Avg PPH</div><div class="mgr-kpi-val" style="color:${color}">${m.avgPPH.toFixed(1)}</div></div>
-          <div><div class="mgr-kpi-label">GAP%</div><div class="mgr-kpi-val">${(m.avgGAP * 100).toFixed(1)}%</div></div>
-          <div><div class="mgr-kpi-label">Direct Hrs</div><div class="mgr-kpi-val">${m.directHrs.toFixed(0)}</div></div>
-          <div><div class="mgr-kpi-label">Total Hrs</div><div class="mgr-kpi-val">${m.totalHrs.toFixed(0)}</div></div>
-          <div><div class="mgr-kpi-label">Avg Cycle</div><div class="mgr-kpi-val" style="color:var(--accent-purple)">${((ctAvg) => (ctAvg !== null ? fmtSec(ctAvg) : "—"))(getManagerCycleAvg(m.name))}</div></div>
-        </div>
-      </div>${performersCard}
-    </div>`;
-                    })
-                    .join("");
-            }
-
             let activeMgrDetail = null;
-            const coachingComplete = new Set(); // employee names who have been coached this session
-
-            function toggleCoaching(empName) {
-                if (coachingComplete.has(empName)) {
-                    coachingComplete.delete(empName);
-                } else {
-                    coachingComplete.add(empName);
-                }
-                if (window._renderCoachingPanel) window._renderCoachingPanel();
-            }
 
             function drillManager(name) {
                 activeMgrDetail = name;
@@ -5979,7 +6016,7 @@
                 const backWrap = document.getElementById("mgr-back-btn-wrap");
                 if (backWrap)
                     backWrap.style.display =
-                        currentUserRole === "admin" ? "flex" : "none";
+                        (currentUserRole === "admin" || currentUserRole === "ops_manager" || currentUserRole === "general_manager") ? "flex" : "none";
 
                 const rows = getFilteredRows().filter(
                     (r) => r["SUPERVISOR"] === name,
@@ -6013,41 +6050,55 @@
                     empStatsMap[n].rows.push(r);
                 });
 
-                // Pre-compute 6-month dept avg for "Return Item Processed" — stable baseline for Returns Clerk rule
-                const _baselineCTRecords = get6MonthCTRecords();
-                const _headerCTRecords = getFilteredCTRecords(); // employee's own period records
-                const _headerIPFStats = calcCycleStats(
-                    _baselineCTRecords.filter(
-                        (r) => r.action === "Return Item Processed",
-                    ),
+                // ── Shared CT baseline — computed once, reused by all three flag sites ──
+                // 6-month dept avg for "Return Item Processed" (Returns Clerk exception rule)
+                const RETURNS_ACTION = "Return Item Processed";
+                const allCTRecords = getFilteredCTRecords();      // selected period — per-employee lookups
+                const baselineCTRecs = get6MonthCTRecords();       // 6-month window — dept baseline
+                const returnsIPFStats = calcCycleStats(
+                    baselineCTRecs.filter((r) => r.action === RETURNS_ACTION),
                     ctThreshold,
                 ).filter((s) => s.avgCycle > 0);
-                const _headerDeptIPFAvg = _headerIPFStats.length
-                    ? _headerIPFStats.reduce((a, b) => a + b.avgCycle, 0) /
-                      _headerIPFStats.length
+                const deptIPFAvg = returnsIPFStats.length
+                    ? returnsIPFStats.reduce((a, b) => a + b.avgCycle, 0) /
+                      returnsIPFStats.length
                     : null;
 
-                const underPerforming = empNames.filter((n) => {
-                    const e = empStatsMap[n];
-                    const ePPH = weightedPPH(e.rows);
-                    const eGAP = avg(e.rows, "GAP %");
-                    if (ePPH === 0 && eGAP === 0) return false;
-                    if (e.jobTitle === "Returns Clerk") {
-                        if (_headerDeptIPFAvg === null) return false;
-                        const empIPF = calcCycleStats(
-                            _headerCTRecords.filter(
-                                (r) =>
-                                    r.employee === n &&
-                                    r.action === "Return Item Processed",
-                            ),
-                            ctThreshold,
-                        ).filter((s) => s.avgCycle > 0);
-                        return empIPF.length
-                            ? empIPF[0].avgCycle > _headerDeptIPFAvg
-                            : false;
+                // ── computeFlaggedSet ─────────────────────────────────────────────────────
+                // Single flag rule applied to a stats map (key → {rows, jobTitle}).
+                // Returns a Set of employee name strings that should be flagged.
+                // Rule 1: 0 PPH + 0 GAP = no activity → skip (not a performance signal).
+                // Rule 2: Returns Clerk → flag only if avg CT for Return Item Processed
+                //         exceeds the 6-month dept average for that action.
+                // Rule 3: Everyone else → flag if PPH < 100 or GAP > 10%.
+                const computeFlaggedSet = (statsMap) => {
+                    const flagged = new Set();
+                    for (const [empName, e] of Object.entries(statsMap)) {
+                        const ePPH = weightedPPH(e.rows);
+                        const eGAP = avg(e.rows, "GAP %");
+                        if (ePPH === 0 && eGAP === 0) continue;
+                        if (e.jobTitle === "Returns Clerk") {
+                            if (deptIPFAvg === null) continue;
+                            const empIPFStats = calcCycleStats(
+                                allCTRecords.filter(
+                                    (r) =>
+                                        r.employee === empName &&
+                                        r.action === RETURNS_ACTION,
+                                ),
+                                ctThreshold,
+                            ).filter((s) => s.avgCycle > 0);
+                            if (empIPFStats.length && empIPFStats[0].avgCycle > deptIPFAvg)
+                                flagged.add(empName);
+                        } else {
+                            if (ePPH < 100 || eGAP > 0.1) flagged.add(empName);
+                        }
                     }
-                    return ePPH < 100 || eGAP > 0.1;
-                }).length;
+                    return flagged;
+                };
+
+                // Single authoritative flag computation — drives header count, coaching panel, and table rows
+                const flaggedSet = computeFlaggedSet(empStatsMap);
+                const underPerforming = flaggedSet.size;
                 const performing = empCount - underPerforming;
 
                 document.getElementById("mgr-detail-header").innerHTML = `
@@ -6075,16 +6126,35 @@
       <div style="font-size:11px;color:var(--text-muted)">${getManagerTrend(name) === "up" ? "↑ Improving" : getManagerTrend(name) === "down" ? "↓ Declining" : "→ Stable"}</div>
     </div>`;
 
-                // KPIs
+                // KPIs — current week values
                 const ctAvg = getManagerCycleAvg(name);
+                const curPPH  = weightedPPH(rows);
+                const curGAP  = avg(rows, "GAP %") * 100;
+                const curHrs  = sum(rows, "DIRECT HOURS");
+
+                // Prior-week values for this manager (reuses globally loaded priorWeekRows)
+                const priorMgrRows = getPriorWeekRows().filter(r => r["SUPERVISOR"] === name);
+                const prevPPH = priorMgrRows.length ? weightedPPH(priorMgrRows) : null;
+                const prevGAP = priorMgrRows.length ? avg(priorMgrRows, "GAP %") * 100 : null;
+                const prevHrs = priorMgrRows.length ? sum(priorMgrRows, "DIRECT HOURS") : null;
+
+                const mgrDelta = (cur, prev, goodUp) => {
+                    if (prev === null || prev === 0) return '<div class="kpi-delta neutral">— no prior week</div>';
+                    const pct = ((cur - prev) / prev) * 100;
+                    const isUp = pct >= 0;
+                    const cls = isUp ? (goodUp ? "up" : "down") : (goodUp ? "down" : "up");
+                    return `<div class="kpi-delta ${cls}">${isUp ? "↑" : "↓"} ${isUp ? "+" : ""}${pct.toFixed(1)}% vs prior week</div>`;
+                };
+
                 document.getElementById("mgr-detail-kpis").innerHTML = `
-    <div class="kpi-card cyan"><div class="kpi-label">Avg PPH</div><div class="kpi-value">${weightedPPH(rows).toFixed(1)}</div></div>
+    <div class="kpi-card cyan"><div class="kpi-label">Avg PPH</div><div class="kpi-value">${curPPH.toFixed(1)}</div>${mgrDelta(curPPH, prevPPH, true)}</div>
     <div class="kpi-card green"><div class="kpi-label">Best PPH</div><div class="kpi-value">${Math.max(...rows.map((r) => parseFloat(r["PPH"]) || 0)).toFixed(1)}</div></div>
-    <div class="kpi-card amber"><div class="kpi-label">Avg GAP%</div><div class="kpi-value">${(avg(rows, "GAP %") * 100).toFixed(1)}%</div></div>
-    <div class="kpi-card purple"><div class="kpi-label">Direct Hrs</div><div class="kpi-value">${sum(rows, "DIRECT HOURS").toFixed(0)}h</div></div>
+    <div class="kpi-card amber"><div class="kpi-label">Avg GAP%</div><div class="kpi-value">${curGAP.toFixed(1)}%</div>${mgrDelta(curGAP, prevGAP, false)}</div>
+    <div class="kpi-card purple"><div class="kpi-label">Direct Hrs</div><div class="kpi-value">${curHrs.toFixed(0)}h</div>${mgrDelta(curHrs, prevHrs, true)}</div>
     <div class="kpi-card red"><div class="kpi-label">Avg Cycle</div><div class="kpi-value" style="font-size:20px">${ctAvg !== null ? fmtSec(ctAvg) : "—"}</div></div>`;
 
-                // Flagged panel — build before employee tables so we can reuse same logic
+                // Flagged panel — build empMapForFlags for panel rendering (name + rows needed)
+                // Flag determination reuses flaggedSet already computed above via computeFlaggedSet()
                 const empMapForFlags = {};
                 rows.forEach((r) => {
                     const n = r["EMPLOYEE"];
@@ -6097,51 +6167,9 @@
                     empMapForFlags[n].rows.push(r);
                 });
 
-                // Pre-compute 6-month dept avg for "Return Item Processed" — stable baseline
-                const RETURNS_ACTION = "Return Item Processed";
-                const allCTRecords = getFilteredCTRecords(); // selected period — for employee lookups
-                const baselineCTRecs = get6MonthCTRecords(); // 6-month window — for dept baseline
-                const returnsIPFRecords = baselineCTRecs.filter(
-                    (r) => r.action === RETURNS_ACTION,
-                );
-                const returnsIPFStats = calcCycleStats(
-                    returnsIPFRecords,
-                    ctThreshold,
-                ).filter((s) => s.avgCycle > 0);
-                const deptIPFAvg = returnsIPFStats.length
-                    ? returnsIPFStats.reduce((a, b) => a + b.avgCycle, 0) /
-                      returnsIPFStats.length
-                    : null;
-
+                // flaggedEmps: only employees whose name is in flaggedSet (single source of truth)
                 const flaggedEmps = Object.values(empMapForFlags)
-                    .filter((e) => {
-                        const ePPH = weightedPPH(e.rows);
-                        const eGAP = avg(e.rows, "GAP %");
-
-                        // Rule 1: zero PPH and zero GAP = no activity, skip
-                        if (ePPH === 0 && eGAP === 0) return false;
-
-                        // Rule 2: Returns Clerks — only flag if their avg cycle for Return Item Processed
-                        // exceeds the dept average for that action
-                        if (e.jobTitle === "Returns Clerk") {
-                            if (deptIPFAvg === null) return false;
-                            const empIPFRecords = allCTRecords.filter(
-                                (r) =>
-                                    r.employee === e.name &&
-                                    r.action === RETURNS_ACTION,
-                            );
-                            const empIPFStats = calcCycleStats(
-                                empIPFRecords,
-                                ctThreshold,
-                            ).filter((s) => s.avgCycle > 0);
-                            if (!empIPFStats.length) return false;
-                            const empIPFAvg = empIPFStats[0].avgCycle;
-                            return empIPFAvg > deptIPFAvg;
-                        }
-
-                        // Rule 3: Everyone else — flag if PPH < 100 or GAP > 10%
-                        return ePPH < 100 || eGAP > 0.1;
-                    })
+                    .filter((e) => flaggedSet.has(e.name))
                     .sort((a, b) => a.name.localeCompare(b.name));
 
                 const flagPanel = document.getElementById("mgr-flagged-panel");
@@ -6150,14 +6178,12 @@
                 } else {
                     flagPanel.style.display = "block";
 
-                    // Build panel — Firestore-backed coaching state; local coachingComplete for
-                    // backwards-compatible "mark coached" toggle (kept for sessions with no CTs)
+                    // Build panel — Firestore-backed coaching state drives all visual states
                     const renderCoachingPanel = () => {
-                        // Count employees whose coaching doc is submitted or locked (Firestore) OR
-                        // locally marked coached (legacy coachingComplete toggle)
+                        // Count employees whose coaching doc is submitted or locked (Firestore)
                         const doneCount = flaggedEmps.filter((e) => {
                             const doc = Object.values(managerCoachingDocs).find(c => c.employeeName === e.name);
-                            return (doc && (doc.status === "submitted" || doc.status === "locked")) || coachingComplete.has(e.name);
+                            return doc && (doc.status === "submitted" || doc.status === "locked");
                         }).length;
 
                         // Build CT dropdown options — re-read availableCTs each render so newly
@@ -6185,6 +6211,7 @@
                     const lowPPH = ePPH < 100;
                     const highGAP = eGAP > 0.1;
                     const safeName = e.name.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+                    const dropId = e.name.replace(/[^a-zA-Z0-9]/g, "_");
 
                     // Look up Firestore coaching doc for this employee
                     const coachingDoc = Object.values(managerCoachingDocs).find(c => c.employeeName === e.name);
@@ -6193,7 +6220,7 @@
                     const coachingId = coachingDoc ? coachingDoc.id : null;
 
                     // Determine visual state
-                    const isComplete = status === "submitted" || status === "locked" || coachingComplete.has(e.name);
+                    const isComplete = status === "submitted" || status === "locked";
                     const isLocked = status === "locked";
                     const isSubmitted = status === "submitted";
 
@@ -6215,16 +6242,16 @@
                              <button onclick="lockCoaching('${coachingId}')" style="padding:3px 8px;background:var(--accent-green-dim);color:var(--accent-green);border:1px solid var(--accent-green);border-radius:4px;font-size:10px;cursor:pointer;">Lock</button>
                            </div>`
                         : assignedCT
-                        ? `<div style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap;align-items:center;">
-                             <span style="font-size:10px;color:var(--text-muted);">CT: ${assignedCT}</span>
-                             <button onclick="unassignCT('${coachingId}')" style="padding:2px 6px;background:var(--bg-surface);border:1px solid var(--border);border-radius:4px;font-size:9px;cursor:pointer;color:var(--text-muted);">Unassign</button>
+                        ? `<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+                             <span style="font-size:12px;color:var(--text-muted);font-weight:500;">CT: ${assignedCT}</span>
+                             <button onclick="unassignCT('${coachingId}')" style="padding:5px 10px;background:var(--bg-surface);border:1px solid var(--border);border-radius:6px;font-size:11px;cursor:pointer;color:var(--text-muted);">Unassign</button>
                            </div>`
-                        : `<div style="margin-top:6px;display:flex;gap:4px;align-items:center;">
-                             <select id="ct-sel-${safeName}" style="font-size:10px;padding:2px 4px;background:var(--bg-card);border:1px solid var(--border);border-radius:4px;color:var(--text-primary);max-width:120px;">
-                               <option value="">Select CT…</option>
-                               ${ctOptions}
-                             </select>
-                             <button onclick="assignCT('${safeName}', document.getElementById('ct-sel-${safeName}').value)" style="padding:2px 6px;background:var(--accent-cyan-dim);color:var(--accent-cyan);border:1px solid var(--accent-cyan);border-radius:4px;font-size:9px;cursor:pointer;">Assign</button>
+                        : `<div style="margin-top:8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+                             <button id="ct-sel-btn-${dropId}" class="ct-custom-sel-btn" data-value="" onclick="openCTDropdown(this, '${dropId}')">
+                               <span class="ct-sel-label" style="color:var(--text-muted)">Select CT…</span>
+                               <span style="font-size:9px;opacity:0.5">▼</span>
+                             </button>
+                             <button onclick="assignCT('${safeName}', getCTSelVal('${dropId}'), ${ePPH.toFixed(2)}, ${(eGAP*100).toFixed(2)})" style="padding:6px 12px;background:var(--accent-cyan-dim);color:var(--accent-cyan);border:1px solid var(--accent-cyan);border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">Assign</button>
                            </div>`;
 
                     return `<div style="padding:9px 12px;
@@ -6477,10 +6504,8 @@
                 });
 
                 const emps = Object.values(empMap);
-                const totalFlagged = emps.filter(
-                    (e) =>
-                        weightedPPH(e.rows) < 100 || avg(e.rows, "GAP %") > 0.1,
-                ).length;
+                // Use flaggedSet (single source of truth from computeFlaggedSet) for the badge count
+                const totalFlagged = emps.filter((e) => flaggedSet.has(e.name)).length;
 
                 document.getElementById("mgr-detail-emp-count").textContent =
                     `${emps.length} EMPLOYEES`;
@@ -6526,26 +6551,8 @@
                             const titleMaxPPH = Math.max(
                                 ...titleEmps.map((e) => weightedPPH(e.rows)),
                             );
-                            const titleFlagged = titleEmps.filter((e) => {
-                                const ePPH = weightedPPH(e.rows);
-                                const eGAP = avg(e.rows, "GAP %");
-                                if (ePPH === 0 && eGAP === 0) return false;
-                                if (e.jobTitle === "Returns Clerk") {
-                                    if (deptIPFAvg === null) return false;
-                                    const empR = calcCycleStats(
-                                        allCTRecords.filter(
-                                            (r) =>
-                                                r.employee === e.name &&
-                                                r.action === RETURNS_ACTION,
-                                        ),
-                                        ctThreshold,
-                                    ).filter((s) => s.avgCycle > 0); // employee uses selected period
-                                    return empR.length
-                                        ? empR[0].avgCycle > deptIPFAvg
-                                        : false;
-                                }
-                                return ePPH < 100 || eGAP > 0.1;
-                            }).length;
+                            // Use flaggedSet (single source of truth) for per-title badge count
+                            const titleFlagged = titleEmps.filter((e) => flaggedSet.has(e.name)).length;
 
                             const rows_html = titleEmps
                                 .map((e, i) => {
@@ -6593,55 +6600,23 @@
                                             ? `<span class="mono" style="color:var(--accent-purple)">${fmtSec(ctOverallAvg)}</span>`
                                             : `<span style="color:var(--text-muted);font-size:10px">—</span>`;
 
-                                    // ── Coaching rules ──
-                                    // Rule 1: 0 PPH + 0 GAP = no activity, no highlighting
-                                    const noActivity =
-                                        avgPPH === 0 && avgGAP === 0;
+                                    // ── Flag state from single source of truth ──
+                                    // flaggedSet (computed once via computeFlaggedSet) drives row highlight.
+                                    // Individual badge reasons are still computed here for label display only.
+                                    const noActivity = avgPPH === 0 && avgGAP === 0;
 
-                                    // Rule 2: Returns Clerk — flag only if avg CT for Return Item Processed > dept avg
-                                    let isReturnsClerkFlagged = false;
-                                    if (
-                                        !noActivity &&
-                                        e.jobTitle === "Returns Clerk"
-                                    ) {
-                                        if (deptIPFAvg !== null) {
-                                            const empReturnRecs =
-                                                allCTRecords.filter(
-                                                    (r) =>
-                                                        r.employee === e.name &&
-                                                        r.action ===
-                                                            RETURNS_ACTION,
-                                                );
-                                            const empReturnStats =
-                                                calcCycleStats(
-                                                    empReturnRecs,
-                                                    ctThreshold,
-                                                ).filter((s) => s.avgCycle > 0);
-                                            isReturnsClerkFlagged =
-                                                empReturnStats.length
-                                                    ? empReturnStats[0]
-                                                          .avgCycle > deptIPFAvg
-                                                    : false;
-                                        }
-                                    }
-
-                                    // Rule 3: Everyone else — flag if PPH < 100 or GAP > 10%
-                                    const flagLowPPH =
-                                        !noActivity &&
-                                        e.jobTitle !== "Returns Clerk" &&
-                                        avgPPH < 100;
-                                    const flagHighGAP =
-                                        !noActivity &&
-                                        e.jobTitle !== "Returns Clerk" &&
-                                        avgGAP > 0.1;
-                                    const flagged =
-                                        e.jobTitle === "Returns Clerk"
-                                            ? isReturnsClerkFlagged
-                                            : flagLowPPH || flagHighGAP;
+                                    // flagged: from pre-computed set — no duplicate rule evaluation
+                                    const flagged = flaggedSet.has(e.name);
 
                                     const rowBg = flagged
                                         ? "background:rgba(248,81,73,0.07);border-left:3px solid var(--accent-red);"
                                         : "";
+
+                                    // Badge labels: per-reason display (independent of flaggedSet)
+                                    const flagLowPPH = !noActivity && e.jobTitle !== "Returns Clerk" && avgPPH < 100;
+                                    const flagHighGAP = !noActivity && e.jobTitle !== "Returns Clerk" && avgGAP > 0.1;
+                                    // For Returns Clerk: show HIGH CT badge if flagged (already known from flaggedSet)
+                                    const isReturnsClerkFlagged = e.jobTitle === "Returns Clerk" && flagged;
 
                                     const flags =
                                         e.jobTitle === "Returns Clerk"
@@ -6751,7 +6726,71 @@
             }
 
             // Assign a CT to an employee (create or update the coaching doc).
-            async function assignCT(employeeName, ctUid) {
+            // Custom CT dropdown — position:fixed via getBoundingClientRect bypasses WebKit
+            // misposition bug that occurs when a native <select> is inside a scroll container.
+            function openCTDropdown(btn, dropId) {
+                const existing = document.getElementById("ct-floating-dropdown");
+                if (existing) {
+                    const wasForBtn = existing._forBtn === btn;
+                    existing.remove();
+                    document.removeEventListener("click", _ctDropClose);
+                    if (wasForBtn) return;
+                }
+                if (!availableCTs.length) return;
+
+                const rect = btn.getBoundingClientRect();
+                const drop = document.createElement("div");
+                drop.id = "ct-floating-dropdown";
+                drop._forBtn = btn;
+                drop.style.minWidth = Math.max(rect.width, 180) + "px";
+                drop.style.left = rect.left + "px";
+
+                const itemH = 38;
+                const neededH = Math.min(220, (availableCTs.length + 1) * itemH);
+                const spaceBelow = window.innerHeight - rect.bottom - 8;
+                const spaceAbove = rect.top - 8;
+                if (spaceBelow >= neededH || spaceBelow >= spaceAbove) {
+                    drop.style.top = (rect.bottom + 4) + "px";
+                } else {
+                    drop.style.top = (rect.top - Math.min(neededH, spaceAbove) - 4) + "px";
+                }
+
+                const mkItem = (label, uid, isPlaceholder) => {
+                    const d = document.createElement("div");
+                    d.className = "ct-drop-item" + (isPlaceholder ? " ct-drop-placeholder" : "");
+                    d.textContent = label;
+                    d.onclick = (e) => {
+                        e.stopPropagation();
+                        btn.dataset.value = uid;
+                        const lbl = btn.querySelector(".ct-sel-label");
+                        lbl.textContent = label;
+                        lbl.style.color = uid ? "var(--text-primary)" : "var(--text-muted)";
+                        drop.remove();
+                        document.removeEventListener("click", _ctDropClose);
+                    };
+                    return d;
+                };
+
+                drop.appendChild(mkItem("Select CT…", "", true));
+                availableCTs.forEach(ct => drop.appendChild(mkItem(ct.name, ct.uid, false)));
+                document.body.appendChild(drop);
+                setTimeout(() => document.addEventListener("click", _ctDropClose), 0);
+            }
+
+            function _ctDropClose(e) {
+                const drop = document.getElementById("ct-floating-dropdown");
+                if (drop && !drop.contains(e.target)) {
+                    drop.remove();
+                    document.removeEventListener("click", _ctDropClose);
+                }
+            }
+
+            function getCTSelVal(dropId) {
+                const btn = document.getElementById("ct-sel-btn-" + dropId);
+                return btn ? (btn.dataset.value || "") : "";
+            }
+
+            async function assignCT(employeeName, ctUid, snapshotPPH = null, snapshotGAP = null) {
                 if (!ctUid) return;
                 const ct = availableCTs.find(c => c.uid === ctUid);
                 if (!ct) return;
@@ -6772,14 +6811,23 @@
 
                 const managerName = currentUserSupervisor || currentUser.email.split("@")[0];
                 const existing = Object.values(managerCoachingDocs).find(c => c.employeeName === employeeName);
+                const dateFrom = document.getElementById("date-from")?.value || null;
+                const dateTo   = document.getElementById("date-to")?.value   || null;
 
                 try {
+                    const pph = snapshotPPH != null ? parseFloat(snapshotPPH) : null;
+                    const gap = snapshotGAP != null ? parseFloat(snapshotGAP) : null;
+
                     if (existing) {
                         await db.collection("coachings").doc(existing.id).update({
                             ctId: ctUid,
                             ctName: ct.name,
                             status: "assigned",
-                            assignedAt: firebase.firestore.FieldValue.serverTimestamp()
+                            assignedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                            dateFrom,
+                            dateTo,
+                            snapshotPPH: pph,
+                            snapshotGAP: gap
                         });
                     } else {
                         await db.collection("coachings").add({
@@ -6790,6 +6838,10 @@
                             ctName: ct.name,
                             status: "assigned",
                             assignedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                            dateFrom,
+                            dateTo,
+                            snapshotPPH: pph,
+                            snapshotGAP: gap,
                             submittedAt: null,
                             lockedAt: null,
                             trainingPoints: [],
@@ -7363,120 +7415,15 @@
                     .join("");
             }
 
-            // ══════════════════════════════════════════
-            // EMPLOYEES PAGE
-            // ══════════════════════════════════════════
-            function renderEmployeeCards() {
-                if (!allDays.length) return;
-                const rows = getFilteredRows();
-                const search = (
-                    document.getElementById("emp-search")?.value || ""
-                ).toLowerCase();
-                const mgrFil =
-                    document.getElementById("mgr-filter")?.value || "all";
-
-                // populate manager filter
-                const mgrs = [
-                    ...new Set(
-                        rows.map((r) => r["SUPERVISOR"]).filter(Boolean),
-                    ),
-                ];
-                const mgrSel = document.getElementById("mgr-filter");
-                const cur = mgrSel?.value;
-                if (mgrSel) {
-                    mgrSel.innerHTML =
-                        '<option value="all">All Managers</option>' +
-                        mgrs
-                            .map((m) => `<option value="${m}">${m}</option>`)
-                            .join("");
-                    if (mgrs.includes(cur)) mgrSel.value = cur;
-                }
-
-                const empMap = {};
-                rows.forEach((r) => {
-                    const n = r["EMPLOYEE"];
-                    if (!n) return;
-                    if (!empMap[n])
-                        empMap[n] = {
-                            name: n,
-                            supervisor: r["SUPERVISOR"],
-                            rows: [],
-                        };
-                    empMap[n].rows.push(r);
-                });
-
-                let emps = Object.values(empMap);
-                if (search)
-                    emps = emps.filter((e) =>
-                        e.name.toLowerCase().includes(search),
-                    );
-                if (mgrFil !== "all")
-                    emps = emps.filter((e) => e.supervisor === mgrFil);
-                emps.sort((a, b) => weightedPPH(b.rows) - weightedPPH(a.rows));
-
-                const avatarColors = [
-                    ["#1f3a5f", "#58a6ff"],
-                    ["#1a3a22", "#3fb950"],
-                    ["#3a2e0a", "#d29922"],
-                    ["#2d1f4a", "#bc8cff"],
-                    ["#3d1b1b", "#f85149"],
-                ];
-
-                document.getElementById("employee-grid").innerHTML =
-                    emps
-                        .map((e, i) => {
-                            const avgPPH = weightedPPH(e.rows);
-                            const avgGAP = avg(e.rows, "GAP %");
-                            const totalHrs = sum(e.rows, "TOTAL HOURS");
-                            const [bg, fg] =
-                                avatarColors[i % avatarColors.length];
-                            const noActivity = avgPPH === 0 && avgGAP === 0;
-                            const pphColor = noActivity
-                                ? "var(--text-muted)"
-                                : avgPPH >= 100
-                                  ? "var(--accent-green)"
-                                  : "var(--accent-red)";
-                            const gapColor = noActivity
-                                ? "var(--text-muted)"
-                                : avgGAP <= 0.1
-                                  ? "var(--accent-green)"
-                                  : "var(--accent-red)";
-                            return `<div class="emp-card" onclick="showEmployeeDetail('${e.name.replace(/'/g, "\\'")}')">
-      <div class="emp-card-header">
-        <div class="emp-avatar" style="background:${bg};color:${fg}">${getInitials(e.name)}</div>
-        <div>
-          <div class="emp-name">${e.name}</div>
-          <div class="emp-meta">${e.supervisor || "No supervisor"}</div>
-        </div>
-      </div>
-      <div class="emp-stats">
-        <div class="emp-stat-box">
-          <div class="emp-stat-label">Avg PPH</div>
-          <div class="emp-stat-val" style="color:${pphColor}">${avgPPH.toFixed(1)}</div>
-        </div>
-        <div class="emp-stat-box">
-          <div class="emp-stat-label">GAP%</div>
-          <div class="emp-stat-val" style="color:${gapColor}">${(avgGAP * 100).toFixed(1)}%</div>
-        </div>
-        <div class="emp-stat-box" style="grid-column:1/-1">
-          <div class="emp-stat-label">Total Hours (current period)</div>
-          <div class="emp-stat-val" style="font-size:13px">${totalHrs.toFixed(0)}h</div>
-        </div>
-      </div>
-    </div>`;
-                        })
-                        .join("") ||
-                    '<div class="no-data-msg">no employees match filter</div>';
-            }
 
             function showEmployeeDetail(name) {
                 currentEmployee = name;
-                document.getElementById("employees-content").style.display =
-                    "none";
-                document.getElementById("employees-empty").style.display =
-                    "none";
-                document.getElementById("employee-detail").style.display =
-                    "block";
+                // Open the employee detail modal overlay (Item 4 — demoted from full page)
+                const overlay = document.getElementById("employee-detail-overlay");
+                if (overlay) {
+                    overlay.style.display = "block";
+                    overlay.scrollTop = 0;
+                }
 
                 // Respect the date range filter
                 const from = document.getElementById("date-from").value;
@@ -7713,400 +7660,13 @@
             }
 
             function backToEmployees() {
+                // Close the employee detail modal overlay (Item 4)
                 currentEmployee = null;
-                document.getElementById("employee-detail").style.display =
-                    "none";
-                if (empNavSource === "manager" && activeMgrDetail) {
-                    // Return to manager view on the managers page
-                    empNavSource = "employees";
-                    document
-                        .querySelectorAll(".page")
-                        .forEach((p) => p.classList.remove("active"));
-                    document
-                        .querySelectorAll(".nav-item")
-                        .forEach((n) => n.classList.remove("active"));
-                    document
-                        .getElementById("page-managers")
-                        .classList.add("active");
-                    const mgrNavItem = document.querySelector(
-                        '[data-label="Managers"]',
-                    );
-                    if (mgrNavItem) mgrNavItem.classList.add("active");
-                    document.getElementById("page-title").textContent =
-                        "Managers";
-                    document.getElementById("breadcrumb").textContent =
-                        "/ managers";
-                    document.getElementById("mgr-select-screen").style.display =
-                        "none";
-                    document.getElementById("mgr-detail").style.display =
-                        "block";
-                    // Scroll back to top of manager detail
-                    document.getElementById("main").scrollTop = 0;
-                } else {
-                    empNavSource = "employees";
-                    document.getElementById("employees-content").style.display =
-                        "block";
-                    renderEmployeeCards();
-                }
+                empNavSource = "employees";
+                const overlay = document.getElementById("employee-detail-overlay");
+                if (overlay) overlay.style.display = "none";
             }
 
-            // ══════════════════════════════════════════
-            // TRENDS PAGE
-            // ══════════════════════════════════════════
-            function renderTrends() {
-                const has = allDays.length >= 2;
-                document.getElementById("trends-empty").style.display = has
-                    ? "none"
-                    : "block";
-                document.getElementById("trends-content").style.display = has
-                    ? "block"
-                    : "none";
-                if (!has) return;
-
-                const loc = document.getElementById("location-filter").value;
-                const getDayRows = (d) =>
-                    loc === "all"
-                        ? d.rows
-                        : d.rows.filter((r) => r.LOCATION === loc);
-
-                // Insights
-                const latestD = allDays[allDays.length - 1];
-                const prevD = allDays[allDays.length - 2];
-                const latestRows = getDayRows(latestD);
-                const prevRows = getDayRows(prevD);
-                const latestPPH = weightedPPH(latestRows);
-                const prevPPH = weightedPPH(prevRows);
-                const pphDelta =
-                    prevPPH > 0 ? ((latestPPH - prevPPH) / prevPPH) * 100 : 0;
-                const latestGAP = avg(latestRows, "GAP %");
-                const prevGAP = avg(prevRows, "GAP %");
-
-                // 3-day trend
-                const last3 = allDays
-                    .slice(-3)
-                    .map((d) => weightedPPH(getDayRows(d)));
-                const threeDayDir =
-                    last3.length >= 2 ? last3[last3.length - 1] - last3[0] : 0;
-
-                // Best performer
-                const best = latestRows.sort(
-                    (a, b) =>
-                        (parseFloat(b["PPH"]) || 0) -
-                        (parseFloat(a["PPH"]) || 0),
-                )[0];
-
-                const insights = [
-                    {
-                        icon: pphDelta >= 0 ? "↑" : "↓",
-                        bg:
-                            pphDelta >= 0
-                                ? "var(--accent-green-dim)"
-                                : "var(--accent-red-dim)",
-                        color:
-                            pphDelta >= 0
-                                ? "var(--accent-green)"
-                                : "var(--accent-red)",
-                        title: `PPH ${pphDelta >= 0 ? "Improved" : "Declined"} ${Math.abs(pphDelta).toFixed(1)}% vs Yesterday`,
-                        text: `Department averaged ${latestPPH.toFixed(1)} PPH today vs ${prevPPH.toFixed(1)} yesterday.`,
-                    },
-                    {
-                        icon: "⬡",
-                        bg: "var(--accent-cyan-dim)",
-                        color: "var(--accent-cyan)",
-                        title: `3-Day PPH Trajectory: ${threeDayDir >= 0 ? "Rising" : "Falling"}`,
-                        text: `Over the last 3 days, PPH has ${threeDayDir >= 0 ? "risen" : "fallen"} by ${Math.abs(threeDayDir).toFixed(1)} points.`,
-                    },
-                    {
-                        icon: "★",
-                        bg: "var(--accent-amber-dim)",
-                        color: "var(--accent-amber)",
-                        title: `Top Performer: ${best?.["EMPLOYEE"] || "—"}`,
-                        text: `Leading with ${parseFloat(best?.["PPH"] || 0).toFixed(1)} PPH and ${(parseFloat(best?.["GAP %"] || 0) * 100).toFixed(1)}% GAP today.`,
-                    },
-                    {
-                        icon: "⚠",
-                        bg: "var(--accent-amber-dim)",
-                        color: "var(--accent-amber)",
-                        title: `GAP% ${latestGAP > prevGAP ? "Worsened" : "Improved"}`,
-                        text: `Department GAP% moved from ${(prevGAP * 100).toFixed(1)}% to ${(latestGAP * 100).toFixed(1)}%.`,
-                    },
-                ];
-
-                document.getElementById("insights-grid").innerHTML = insights
-                    .map(
-                        (ins) => `
-    <div class="insight-card">
-      <div class="insight-icon-wrap" style="background:${ins.bg};color:${ins.color}">${ins.icon}</div>
-      <div class="insight-body">
-        <div class="insight-title">${ins.title}</div>
-        <div class="insight-text">${ins.text}</div>
-      </div>
-    </div>`,
-                    )
-                    .join("");
-
-                // Charts
-                setTimeout(() => {
-                    destroyChart("dept-pph");
-                    destroyChart("gap-trend");
-                    destroyChart("mgr-multi");
-
-                    const labels = allDays.map((d) => d.date);
-                    const deptData = allDays.map((d) =>
-                        parseFloat(weightedPPH(getDayRows(d)).toFixed(2)),
-                    );
-                    const gapData = allDays.map((d) =>
-                        parseFloat(
-                            (avg(getDayRows(d), "GAP %") * 100).toFixed(2),
-                        ),
-                    );
-
-                    const pphCtx = document
-                        .getElementById("chart-dept-pph")
-                        .getContext("2d");
-                    activeCharts["dept-pph"] = new Chart(pphCtx, {
-                        type: "line",
-                        data: {
-                            labels,
-                            datasets: [
-                                {
-                                    label: "Dept PPH",
-                                    data: deptData,
-                                    borderColor: COLORS.cyan,
-                                    backgroundColor: "rgba(88,166,255,0.1)",
-                                    borderWidth: 2,
-                                    pointBackgroundColor: COLORS.cyan,
-                                    pointRadius: 4,
-                                    tension: 0.3,
-                                    fill: true,
-                                },
-                            ],
-                        },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: { legend: { display: false } },
-                            scales: {
-                                x: {
-                                    ticks: {
-                                        color: COLORS.text,
-                                        font: { size: 11 },
-                                    },
-                                    grid: { color: "rgba(48,54,61,0.5)" },
-                                },
-                                y: {
-                                    ticks: {
-                                        color: COLORS.text,
-                                        font: { size: 11 },
-                                    },
-                                    grid: { color: "rgba(48,54,61,0.5)" },
-                                },
-                            },
-                        },
-                    });
-
-                    const gCtx = document
-                        .getElementById("chart-gap-trend")
-                        .getContext("2d");
-                    activeCharts["gap-trend"] = new Chart(gCtx, {
-                        type: "line",
-                        data: {
-                            labels,
-                            datasets: [
-                                {
-                                    label: "GAP%",
-                                    data: gapData,
-                                    borderColor: COLORS.amber,
-                                    backgroundColor: "rgba(210,153,34,0.1)",
-                                    borderWidth: 2,
-                                    pointBackgroundColor: COLORS.amber,
-                                    pointRadius: 4,
-                                    tension: 0.3,
-                                    fill: true,
-                                },
-                            ],
-                        },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: { legend: { display: false } },
-                            scales: {
-                                x: {
-                                    ticks: {
-                                        color: COLORS.text,
-                                        font: { size: 11 },
-                                    },
-                                    grid: { color: "rgba(48,54,61,0.5)" },
-                                },
-                                y: {
-                                    ticks: {
-                                        color: COLORS.text,
-                                        font: { size: 11 },
-                                    },
-                                    grid: { color: "rgba(48,54,61,0.5)" },
-                                },
-                            },
-                        },
-                    });
-
-                    const mgrs = [
-                        ...new Set(
-                            allDays
-                                .flatMap((d) =>
-                                    getDayRows(d).map((r) => r["SUPERVISOR"]),
-                                )
-                                .filter(Boolean),
-                        ),
-                    ];
-                    const mCtx = document
-                        .getElementById("chart-mgr-pph-multi")
-                        .getContext("2d");
-                    activeCharts["mgr-multi"] = new Chart(mCtx, {
-                        type: "line",
-                        data: {
-                            labels,
-                            datasets: mgrs.map((m, i) => ({
-                                label: m,
-                                data: allDays.map((d) => {
-                                    const r = getDayRows(d).filter(
-                                        (r) => r["SUPERVISOR"] === m,
-                                    );
-                                    return r.length
-                                        ? parseFloat(weightedPPH(r).toFixed(2))
-                                        : null;
-                                }),
-                                borderColor: getMgrColor(i),
-                                backgroundColor: "transparent",
-                                borderWidth: 2,
-                                pointRadius: 4,
-                                tension: 0.3,
-                                spanGaps: true,
-                            })),
-                        },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: {
-                                legend: {
-                                    labels: {
-                                        color: COLORS.text,
-                                        font: { size: 11 },
-                                        boxWidth: 10,
-                                    },
-                                },
-                            },
-                            scales: {
-                                x: {
-                                    ticks: {
-                                        color: COLORS.text,
-                                        font: { size: 11 },
-                                    },
-                                    grid: { color: "rgba(48,54,61,0.5)" },
-                                },
-                                y: {
-                                    ticks: {
-                                        color: COLORS.text,
-                                        font: { size: 11 },
-                                    },
-                                    grid: { color: "rgba(48,54,61,0.5)" },
-                                },
-                            },
-                        },
-                    });
-                }, 100);
-
-                // Flagged employees
-                const empNames = [
-                    ...new Set(
-                        allDays
-                            .flatMap((d) =>
-                                getDayRows(d).map((r) => r["EMPLOYEE"]),
-                            )
-                            .filter(Boolean),
-                    ),
-                ];
-                const flagged = [];
-                empNames.forEach((name) => {
-                    const timeline = allDays
-                        .map((d) => {
-                            const r = getDayRows(d).find(
-                                (r) => r["EMPLOYEE"] === name,
-                            );
-                            return r
-                                ? {
-                                      date: d.date,
-                                      pph: parseFloat(r["PPH"]) || 0,
-                                  }
-                                : null;
-                        })
-                        .filter(Boolean);
-                    if (timeline.length < 2) return;
-
-                    const pphs = timeline.map((t) => t.pph);
-                    const peak = Math.max(...pphs);
-                    const latest = pphs[pphs.length - 1];
-                    const delta = peak > 0 ? ((latest - peak) / peak) * 100 : 0;
-
-                    // Consistent decline: last 3 days each lower
-                    let consistentDecline = false;
-                    if (pphs.length >= 3) {
-                        const last3 = pphs.slice(-3);
-                        consistentDecline =
-                            last3[1] < last3[0] && last3[2] < last3[1];
-                    }
-
-                    // Major single-day swing
-                    let bigSwing = false;
-                    for (let i = 1; i < pphs.length; i++) {
-                        if (
-                            pphs[i - 1] > 0 &&
-                            Math.abs(
-                                ((pphs[i] - pphs[i - 1]) / pphs[i - 1]) * 100,
-                            ) >= 20
-                        ) {
-                            bigSwing = true;
-                            break;
-                        }
-                    }
-
-                    if (delta <= -15 || consistentDecline || bigSwing) {
-                        const supervisor =
-                            allDays[allDays.length - 1].rows.find(
-                                (r) => r["EMPLOYEE"] === name,
-                            )?.["SUPERVISOR"] || "—";
-                        flagged.push({
-                            name,
-                            supervisor,
-                            pattern: consistentDecline
-                                ? "Consistent Decline"
-                                : bigSwing
-                                  ? "Major Swing"
-                                  : "Peak Drop",
-                            days: timeline.length,
-                            peak,
-                            latest,
-                            delta,
-                        });
-                    }
-                });
-
-                document.getElementById("flagged-body").innerHTML =
-                    flagged.length
-                        ? flagged
-                              .map(
-                                  (f) => `<tr>
-        <td style="color:var(--text-primary);font-weight:500">${f.name}</td>
-        <td>${f.supervisor}</td>
-        <td><span class="trend-pill down">${f.pattern}</span></td>
-        <td class="mono">${f.days}</td>
-        <td class="mono" style="color:var(--accent-green)">${f.peak.toFixed(1)}</td>
-        <td class="mono" style="color:var(--accent-red)">${f.latest.toFixed(1)}</td>
-        <td class="mono" style="color:var(--accent-red)">${f.delta.toFixed(1)}%</td>
-      </tr>`,
-                              )
-                              .join("")
-                        : '<tr><td colspan="7" class="no-data-msg">✓ no employees flagged</td></tr>';
-            }
 
             // ══════════════════════════════════════════
             // HISTORY PAGE
@@ -8121,7 +7681,7 @@
                 } else {
                     list.style.display = "block";
                     empty.style.display = "none";
-                    const loc = document.getElementById("location-filter").value;
+                    const loc = document.getElementById("location-filter")?.value ?? "all";
                     list.innerHTML = allDays
                         .slice()
                         .reverse()
@@ -8460,7 +8020,6 @@
                 const page = getActivePage();
                 if (page === "cycletime") renderCycleTime();
                 else if (page === "managers") renderManagers();
-                else if (allDays.length) renderManagerGrid(getFilteredRows());
             }
 
             // ══════════════════════════════════════════
@@ -9198,6 +8757,9 @@
                 if (currentUserRole === "ct") {
                     // Show the coaching nav item (hidden by default for all roles)
                     document.querySelectorAll(".nav-item[data-page='coaching']").forEach(n => n.style.display = "");
+                    // CTs have one page — hide the mobile bottom nav (all its tabs are non-CT pages)
+                    const mobileNav = document.getElementById("mobile-nav");
+                    if (mobileNav) mobileNav.style.display = "none";
                     // Activate the coaching page
                     document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
                     const coachingPage = document.getElementById("page-coaching");
@@ -9250,17 +8812,21 @@
                 // Step 5: Render the active page
                 const page = getActivePage();
                 if (page === "managers") renderManagers();
-                if (page === "employees") renderEmployeeCards();
-                if (page === "trends") renderTrends();
                 if (page === "history") renderHistory();
                 if (page === "users") renderUsersPage();
 
-                // Step 6: Load CT data lazily only if on cycle time tab, else defer to tab navigation
-                if (page === "cycletime") {
+                // Step 6: Always load CT data — needed for Avg Cycle in manager detail.
+                // Await only if on the cycle time tab (so renderCycleTime has data);
+                // otherwise fire in background so it's ready when the user drills into a manager.
+                {
                     const from = document.getElementById("date-from").value;
                     const to = document.getElementById("date-to").value;
-                    await loadCTData(from, to);
-                    renderCycleTime();
+                    if (page === "cycletime") {
+                        await loadCTData(from, to);
+                        renderCycleTime();
+                    } else {
+                        loadCTData(from, to);
+                    }
                 }
 
                 // Auth gate: role resolved, data loaded, UI ready — reveal the app
@@ -9276,6 +8842,8 @@
                 const page = getActivePage();
                 if (page === "cycletime") {
                     await loadCTData(from, to);
+                } else {
+                    loadCTData(from, to); // background load for manager detail cycle avg
                 }
             }
 
@@ -9285,6 +8853,33 @@
             // at script parse time since the script tag is at the end of the body).
             initDateRangePicker();
         </script>
+        <!-- ADD SHIFT OVERLAY — GM only; creates a named shift -->
+        <div id="add-shift-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:1000; align-items:center; justify-content:center;">
+            <div style="background:var(--surface-1,#161b22); border:1px solid var(--border); border-radius:10px; padding:1.5rem; width:340px; max-width:90vw;">
+                <div style="font-weight:600; font-size:1rem; margin-bottom:1rem; color:var(--text-primary);">Add Shift</div>
+                <input id="add-shift-input" type="text" placeholder="e.g. Weekday, Night Shift…"
+                    style="width:100%; padding:0.5rem 0.75rem; background:var(--surface-2,#1e2430); border:1px solid var(--border); border-radius:6px; color:var(--text-primary); font-size:0.9rem; box-sizing:border-box; margin-bottom:1rem;"
+                    onkeydown="if(event.key==='Enter') createShift()">
+                <div style="display:flex; gap:8px; justify-content:flex-end;">
+                    <button onclick="document.getElementById('add-shift-overlay').style.display='none'" style="padding:0.45rem 1rem; background:none; border:1px solid var(--border); border-radius:6px; color:var(--text-muted); cursor:pointer;">Cancel</button>
+                    <button onclick="createShift()" style="padding:0.45rem 1rem; background:var(--accent-green,#4ade80); color:#0d1117; border:none; border-radius:6px; font-weight:600; cursor:pointer;">Create</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ASSIGN TEAM OVERLAY — GM assigns managers/AMs to an OM's team -->
+        <div id="assign-team-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:1000; align-items:center; justify-content:center;">
+            <div style="background:var(--surface-1,#161b22); border:1px solid var(--border); border-radius:10px; padding:1.5rem; width:480px; max-width:92vw; max-height:80vh; display:flex; flex-direction:column; gap:0;">
+                <div style="font-weight:600; font-size:1rem; margin-bottom:0.25rem; color:var(--text-primary);" id="assign-team-title">Manage Team</div>
+                <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:1rem;" id="assign-team-subtitle"></div>
+                <div id="assign-team-list" style="overflow-y:auto; flex:1; border:1px solid var(--border); border-radius:6px; padding:0.5rem; min-height:120px; max-height:300px;"></div>
+                <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:1rem;">
+                    <button onclick="document.getElementById('assign-team-overlay').style.display='none'" style="padding:0.45rem 1rem; background:none; border:1px solid var(--border); border-radius:6px; color:var(--text-muted); cursor:pointer;">Cancel</button>
+                    <button id="assign-team-save-btn" onclick="saveOMTeamAssignment()" style="padding:0.45rem 1rem; background:var(--accent-green,#4ade80); color:#0d1117; border:none; border-radius:6px; font-weight:600; cursor:pointer;">Save</button>
+                </div>
+            </div>
+        </div>
+
         <!-- MOBILE BOTTOM NAV -->
         <div id="mobile-nav" style="display: none">
             <button
@@ -9325,22 +8920,6 @@
             </button>
             <button
                 class="mobile-nav-item"
-                data-page="employees"
-                onclick="mobileNav('employees', this)"
-            >
-                <svg
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                >
-                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                    <circle cx="12" cy="7" r="4" />
-                </svg>
-                Employees
-            </button>
-            <button
-                class="mobile-nav-item"
                 data-page="cycletime"
                 onclick="mobileNav('cycletime', this)"
             >
@@ -9354,21 +8933,6 @@
                     <polyline points="12 6 12 12 14 14" />
                 </svg>
                 Cycle
-            </button>
-            <button
-                class="mobile-nav-item"
-                data-page="trends"
-                onclick="mobileNav('trends', this)"
-            >
-                <svg
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                >
-                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-                </svg>
-                Trends
             </button>
         </div>
     </body>
