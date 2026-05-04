@@ -2997,6 +2997,41 @@
                             ></div>
                         </div>
                     </div>
+
+                    <!-- COACHING TEMPLATES SECTION — admin only -->
+                    <div id="coaching-templates-section" style="margin-top:28px; display:none;">
+                        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+                            <div style="font-size:0.75rem; font-weight:600; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-muted);">Coaching Templates</div>
+                            <button onclick="openNewTemplateForm()" style="padding:5px 14px; background:var(--accent-cyan-dim); color:var(--accent-cyan); border:1px solid var(--accent-cyan); border-radius:6px; font-size:12px; font-weight:600; cursor:pointer;">+ New Template</button>
+                        </div>
+                        <div id="coaching-templates-list"></div>
+                        <!-- Inline editor -->
+                        <div id="coaching-template-editor" style="display:none; margin-top:1rem; background:var(--bg-card); border:1px solid var(--border); border-radius:8px; padding:1.25rem;">
+                            <div style="font-weight:600; font-size:0.9rem; color:var(--text-primary); margin-bottom:1rem;" id="template-editor-title">New Template</div>
+                            <div style="margin-bottom:0.75rem;">
+                                <label style="font-size:0.78rem; color:var(--text-muted); display:block; margin-bottom:4px;">Template Name</label>
+                                <input id="template-name-input" type="text" placeholder="e.g. Inventory Processor"
+                                    style="width:100%; padding:0.5rem 0.75rem; background:var(--bg-base); border:1px solid var(--border); border-radius:6px; color:var(--text-primary); font-size:0.875rem; box-sizing:border-box;" />
+                            </div>
+                            <div style="margin-bottom:0.75rem;">
+                                <label style="font-size:0.78rem; color:var(--text-muted); display:block; margin-bottom:4px;">Job Title Mappings <span style="font-weight:400;">(one per line — exact match to CSV job title)</span></label>
+                                <textarea id="template-jobtitles-input" rows="3" placeholder="Returns Clerk&#10;Inventory Processor"
+                                    style="width:100%; padding:0.5rem 0.75rem; background:var(--bg-base); border:1px solid var(--border); border-radius:6px; color:var(--text-primary); font-size:0.875rem; resize:vertical; box-sizing:border-box;"></textarea>
+                            </div>
+                            <div style="margin-bottom:0.75rem;">
+                                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+                                    <label style="font-size:0.78rem; color:var(--text-muted);">Knowledge Points</label>
+                                    <button onclick="addTemplatePoint()" style="padding:3px 10px; background:var(--accent-cyan-dim); color:var(--accent-cyan); border:1px solid var(--accent-cyan); border-radius:4px; font-size:11px; cursor:pointer;">+ Add Point</button>
+                                </div>
+                                <div id="template-points-list"></div>
+                            </div>
+                            <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:1rem;">
+                                <button onclick="cancelTemplateEdit()" style="padding:0.45rem 1rem; background:none; border:1px solid var(--border); border-radius:6px; color:var(--text-muted); cursor:pointer; font-size:0.875rem;">Cancel</button>
+                                <button onclick="saveTemplate()" style="padding:0.45rem 1rem; background:var(--accent-green); color:#0d1117; border:none; border-radius:6px; font-weight:600; cursor:pointer; font-size:0.875rem;">Save Template</button>
+                            </div>
+                            <input type="hidden" id="template-editor-id" value="" />
+                        </div>
+                    </div>
                 </div>
 
                 <!-- COACHING PAGE — visible to CT users only -->
@@ -3011,12 +3046,9 @@
                     <div id="ct-employee-detail" style="display:none;">
                         <button onclick="closeCTEmployeeDetail()" style="margin-bottom:1rem; padding:0.4rem 1rem; background:var(--bg-card); border:1px solid var(--border); border-radius:6px; color:var(--text-muted); cursor:pointer; font-size:0.85rem;">← Back to Assignments</button>
                         <div id="ct-employee-stats"></div>
-                        <div id="coaching-form-container" style="margin-top:1.5rem;">
-                            <div style="padding:1.5rem; background:var(--bg-card); border:1px solid var(--border); border-radius:8px; color:var(--text-muted); font-size:0.9rem; text-align:center;">
-                                Coaching form coming soon
-                            </div>
-                        </div>
-                        <button id="ct-submit-coaching-btn" disabled style="margin-top:1.5rem; width:100%; padding:0.75rem; background:var(--accent-green-dim); color:var(--accent-green); border:1px solid var(--accent-green); border-radius:6px; font-weight:600; font-size:0.95rem; cursor:not-allowed; opacity:0.5;">
+                        <div id="ct-manager-notes" style="display:none; margin-top:1rem;"></div>
+                        <div id="coaching-form-container" style="margin-top:1rem;"></div>
+                        <button id="ct-submit-coaching-btn" disabled onclick="submitCoaching(currentCTCoachingId)" style="margin-top:1.5rem; width:100%; padding:0.75rem; background:var(--accent-green-dim); color:var(--accent-green); border:1px solid var(--accent-green); border-radius:6px; font-weight:600; font-size:0.95rem; cursor:not-allowed; opacity:0.5;">
                             Submit Coaching
                         </button>
                     </div>
@@ -3392,6 +3424,18 @@
             </div>
         </div>
 
+        <!-- COACHING REVIEW MODAL — manager reads completed CT coaching form -->
+        <div id="coaching-review-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:200; align-items:center; justify-content:center;">
+            <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:1.5rem; width:100%; max-width:560px; margin:1rem; max-height:85vh; overflow-y:auto;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.25rem;">
+                    <div style="font-weight:600; color:var(--text-primary); font-size:1rem;">Coaching Review</div>
+                    <button onclick="document.getElementById('coaching-review-overlay').style.display='none'"
+                        style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:1.1rem; line-height:1;">&#x2715;</button>
+                </div>
+                <div id="coaching-review-body"></div>
+            </div>
+        </div>
+
         <!-- CSV UPLOAD PREVIEW MODAL -->
         <!-- Shown before committing any parsed CSV data to Firestore.
              Populated by showUploadPreview(); confirmed by confirmUploadPreview(). -->
@@ -3473,6 +3517,12 @@
             let managerCoachingDocs = {};         // coachingId → coaching data, kept in sync by listener
             let availableCTs = [];               // [{uid, name, email}] from certifiedTrainers collection
             const ctDropdownOpen = new Set();    // UIDs of CTs with expanded assignment dropdown
+
+            // ── Coaching Template admin state ──
+            let coachingTemplates = [];       // [{id, name, jobTitles, points:[{id,label,order}]}]
+            let currentCTFormState = {};      // pointId → {result:"competent"|"review", ctNotes}
+            let currentCTCoachingData = null; // full coaching doc for the open CT employee page
+            let templateEditorPoints = [];    // live-edited point list in admin template editor
 
             // Extract first name from email: "cameron.hodges@co.com" → "cameron"
             function firstNameFromEmail(email) {
@@ -3729,6 +3779,11 @@
                 const addShiftBtn = document.getElementById("add-shift-btn");
                 if (addShiftBtn)
                     addShiftBtn.style.display = currentUserRole === "general_manager" ? "" : "none";
+
+                // Coaching Templates section — admin only
+                const templatesSection = document.getElementById("coaching-templates-section");
+                if (templatesSection)
+                    templatesSection.style.display = currentUserRole === "admin" ? "block" : "none";
             }
 
             // Maps Firebase auth error codes to plain-English messages.
@@ -4748,11 +4803,11 @@
                                 <div class="coaching-cards-grid">
                                     ${group.items.map(c => {
                                         const safeName = c.employeeName.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
-                                        const isComplete  = c.status === "submitted" || c.status === "locked";
-                                        const isLocked    = c.status === "locked";
+                                        const isComplete  = c.status === "submitted" || c.status === "locked" || c.status === "complete";
+                                        const isDone      = c.status === "locked" || c.status === "complete";
                                         const isSubmitted = c.status === "submitted";
-                                        const statusBadge = isLocked
-                                            ? `<span class="ct-status-badge" style="background:var(--accent-green-dim);color:var(--accent-green)">LOCKED</span>`
+                                        const statusBadge = isDone
+                                            ? `<span class="ct-status-badge" style="background:var(--accent-green-dim);color:var(--accent-green)">COMPLETE</span>`
                                             : isSubmitted
                                             ? `<span class="ct-status-badge" style="background:var(--accent-green-dim);color:var(--accent-green)">SUBMITTED</span>`
                                             : `<span class="ct-status-badge" style="background:var(--accent-red-dim);color:var(--accent-red)">NEEDS COACHING</span>`;
@@ -4789,9 +4844,12 @@
                 statsEl.innerHTML = `<div style="color:var(--text-muted); font-size:0.9rem;">Loading ${employeeName}'s stats…</div>`;
 
                 try {
-                    // Fetch the coaching doc to get the manager's date range snapshot
+                    // Fetch the coaching doc to get the manager's date range snapshot and template
                     const coachingDoc = await db.collection("coachings").doc(coachingId).get();
                     const coachingData = coachingDoc.exists ? coachingDoc.data() : {};
+                    // Seed global state for the coaching form — must happen before renderers are called
+                    currentCTCoachingData = coachingData;
+                    currentCTFormState = {};
                     const dateFrom = coachingData.dateFrom || null;
                     const dateTo   = coachingData.dateTo   || null;
 
@@ -4847,9 +4905,185 @@
                             </div>
                         </div>
                     `;
+                    // Render manager notes banner and the interactive coaching form
+                    renderCTManagerNotes(coachingData);
+                    renderCTCoachingForm(coachingData);
                 } catch (e) {
                     console.error("CT employee stats error:", e);
                     statsEl.innerHTML = `<div style="color:var(--accent-red); font-size:0.9rem;">Error loading stats for ${employeeName}.</div>`;
+                }
+            }
+
+            // ── CT COACHING FORM ─────────────────────────────────────────────────────────
+
+            // Show the manager notes banner if the coaching doc has managerNotes or legacy managerComment.
+            function renderCTManagerNotes(coachingData) {
+                const notesEl = document.getElementById("ct-manager-notes");
+                if (!notesEl) return;
+                const notes = coachingData.managerNotes || coachingData.managerComment || "";
+                if (!notes) { notesEl.style.display = "none"; return; }
+                notesEl.style.display = "block";
+                notesEl.innerHTML = `
+                    <div style="padding:0.75rem 1rem; background:var(--accent-amber-dim); border:1px solid var(--accent-amber); border-radius:8px;">
+                        <div style="font-size:0.72rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--accent-amber); margin-bottom:4px;">Manager Notes</div>
+                        <div style="font-size:0.875rem; color:var(--text-primary);">${notes}</div>
+                    </div>`;
+            }
+
+            // Render the coaching form from templatePointsSnapshot.
+            // Shows read-only submitted view or interactive buttons depending on status.
+            function renderCTCoachingForm(coachingData) {
+                const container = document.getElementById("coaching-form-container");
+                const submitBtn = document.getElementById("ct-submit-coaching-btn");
+                if (!container) return;
+
+                const points = (coachingData.templatePointsSnapshot || []).slice().sort((a, b) => a.order - b.order);
+                const isReadOnly = coachingData.status === "submitted"
+                                || coachingData.status === "locked"
+                                || coachingData.status === "complete";
+
+                if (!points.length) {
+                    container.innerHTML = `<div style="padding:1.5rem; background:var(--bg-card); border:1px solid var(--border); border-radius:8px; color:var(--text-muted); font-size:0.875rem; text-align:center;">No coaching points found for this assignment. Contact your manager.</div>`;
+                    if (submitBtn) submitBtn.style.display = "none";
+                    return;
+                }
+
+                if (isReadOnly) {
+                    // Build a map of saved point results for quick lookup
+                    const saved = {};
+                    for (const tp of (coachingData.trainingPoints || [])) saved[tp.id] = tp;
+                    container.innerHTML = `
+                        <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:8px; overflow:hidden;">
+                            <div style="padding:0.75rem 1rem; border-bottom:1px solid var(--border); font-size:0.8rem; font-weight:600; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.06em;">
+                                ${coachingData.templateName || "Coaching Form"} — Submitted
+                            </div>
+                            ${points.map(p => {
+                                const r = saved[p.id];
+                                const result = r ? r.result : null;
+                                const isComp = result === "competent";
+                                const isRev  = result === "review";
+                                return `<div style="padding:0.75rem 1rem; border-bottom:1px solid rgba(255,255,255,0.05);">
+                                    <div style="display:flex; align-items:flex-start; gap:10px;">
+                                        <div style="flex:1; font-size:0.875rem; color:var(--text-primary);">${p.label}</div>
+                                        <div style="flex-shrink:0; font-size:0.72rem; font-weight:700; padding:2px 8px; border-radius:4px;
+                                            background:${isComp ? "var(--accent-green-dim)" : isRev ? "var(--accent-amber-dim)" : "var(--bg-base)"};
+                                            color:${isComp ? "var(--accent-green)" : isRev ? "var(--accent-amber)" : "var(--text-muted)"};">
+                                            ${isComp ? "COMPETENT" : isRev ? "REVIEW" : "—"}
+                                        </div>
+                                    </div>
+                                    ${r && r.ctNotes ? `<div style="margin-top:5px; font-size:0.8rem; color:var(--text-secondary); font-style:italic;">${r.ctNotes}</div>` : ""}
+                                </div>`;
+                            }).join("")}
+                        </div>`;
+                    if (submitBtn) submitBtn.style.display = "none";
+                    return;
+                }
+
+                // Active form — CT selects Competent or Review for each point
+                container.innerHTML = `
+                    <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:8px; overflow:hidden;">
+                        <div style="padding:0.75rem 1rem; border-bottom:1px solid var(--border); font-size:0.8rem; font-weight:600; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.06em;">
+                            ${coachingData.templateName || "Coaching Form"}
+                        </div>
+                        ${points.map(p => `
+                        <div id="form-point-${p.id}" style="padding:0.75rem 1rem; border-bottom:1px solid rgba(255,255,255,0.05);">
+                            <div style="font-size:0.875rem; color:var(--text-primary); margin-bottom:8px;">${p.label}</div>
+                            <div style="display:flex; gap:8px;">
+                                <button id="btn-comp-${p.id}" onclick="setFormPoint('${p.id}', 'competent')"
+                                    style="padding:4px 14px; border-radius:5px; border:1px solid var(--border); background:var(--bg-base); color:var(--text-muted); font-size:12px; font-weight:600; cursor:pointer;">
+                                    Competent</button>
+                                <button id="btn-rev-${p.id}" onclick="setFormPoint('${p.id}', 'review')"
+                                    style="padding:4px 14px; border-radius:5px; border:1px solid var(--border); background:var(--bg-base); color:var(--text-muted); font-size:12px; font-weight:600; cursor:pointer;">
+                                    Review</button>
+                            </div>
+                            <div id="review-notes-${p.id}" style="display:none; margin-top:8px;">
+                                <textarea placeholder="CT observations — what was covered, tips given…" rows="2"
+                                    oninput="updateFormNotes('${p.id}', this.value)"
+                                    style="width:100%; padding:6px 8px; background:var(--bg-base); border:1px solid var(--border); border-radius:5px; color:var(--text-primary); font-size:0.825rem; resize:none; box-sizing:border-box;"></textarea>
+                            </div>
+                        </div>`).join("")}
+                    </div>`;
+
+                if (submitBtn) {
+                    submitBtn.style.display = "";
+                    updateCTSubmitButton();
+                }
+            }
+
+            // Set a form point result (competent or review) and update button visual state.
+            function setFormPoint(pointId, result) {
+                if (!currentCTFormState[pointId]) currentCTFormState[pointId] = { result: null, ctNotes: "" };
+                currentCTFormState[pointId].result = result;
+
+                const compBtn = document.getElementById("btn-comp-" + pointId);
+                const revBtn  = document.getElementById("btn-rev-"  + pointId);
+                const notesEl = document.getElementById("review-notes-" + pointId);
+
+                if (compBtn) {
+                    compBtn.style.background   = result === "competent" ? "var(--accent-green-dim)" : "var(--bg-base)";
+                    compBtn.style.borderColor  = result === "competent" ? "var(--accent-green)"     : "var(--border)";
+                    compBtn.style.color        = result === "competent" ? "var(--accent-green)"     : "var(--text-muted)";
+                }
+                if (revBtn) {
+                    revBtn.style.background   = result === "review" ? "var(--accent-amber-dim)" : "var(--bg-base)";
+                    revBtn.style.borderColor  = result === "review" ? "var(--accent-amber)"     : "var(--border)";
+                    revBtn.style.color        = result === "review" ? "var(--accent-amber)"     : "var(--text-muted)";
+                }
+                // Notes textarea is only shown when the result is "review"
+                if (notesEl) notesEl.style.display = result === "review" ? "block" : "none";
+
+                updateCTSubmitButton();
+            }
+
+            // Update the CT notes for a form point (called from textarea oninput).
+            function updateFormNotes(pointId, value) {
+                if (currentCTFormState[pointId]) currentCTFormState[pointId].ctNotes = value;
+            }
+
+            // Enable or disable the submit button based on whether all points have a result.
+            function updateCTSubmitButton() {
+                const btn = document.getElementById("ct-submit-coaching-btn");
+                if (!btn) return;
+                const points = (currentCTCoachingData?.templatePointsSnapshot || []);
+                const allAnswered = points.length > 0 && points.every(p => currentCTFormState[p.id]?.result);
+                btn.disabled = !allAnswered;
+                btn.style.opacity = allAnswered ? "1" : "0.5";
+                btn.style.cursor  = allAnswered ? "pointer" : "not-allowed";
+            }
+
+            // Submit the completed coaching form to Firestore.
+            async function submitCoaching(coachingId) {
+                if (!coachingId || !currentCTCoachingData) return;
+                const points = (currentCTCoachingData.templatePointsSnapshot || []);
+                if (!points.every(p => currentCTFormState[p.id]?.result)) return;
+
+                const trainingPoints = points.map(p => ({
+                    id: p.id,
+                    label: p.label,
+                    order: p.order,
+                    result: currentCTFormState[p.id].result,
+                    ctNotes: currentCTFormState[p.id].ctNotes || ""
+                }));
+
+                const btn = document.getElementById("ct-submit-coaching-btn");
+                btn.disabled = true;
+                btn.textContent = "Submitting…";
+
+                try {
+                    await db.collection("coachings").doc(coachingId).update({
+                        trainingPoints,
+                        status: "submitted",
+                        submittedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    // Update local state and re-render form as read-only
+                    currentCTCoachingData = { ...currentCTCoachingData, status: "submitted", trainingPoints };
+                    renderCTCoachingForm(currentCTCoachingData);
+                } catch (e) {
+                    console.error("submitCoaching error:", e);
+                    alert("Failed to submit coaching. Please try again.");
+                    btn.disabled = false;
+                    btn.textContent = "Submit Coaching";
+                    updateCTSubmitButton();
                 }
             }
 
@@ -4898,7 +5132,7 @@
                 } else {
                     if (leavingCT) restoreFullDateRange();
                     if (name === "managers") renderManagers();
-                    if (name === "history") renderHistory();
+                    if (name === "history") { renderHistory(); renderCoachingTemplatesList(); }
                     if (name === "users") renderUsersPage();
                 }
             }
@@ -6233,7 +6467,7 @@
                         // Count employees whose coaching doc is submitted or locked (Firestore)
                         const doneCount = flaggedEmps.filter((e) => {
                             const doc = Object.values(managerCoachingDocs).find(c => c.employeeName === e.name);
-                            return doc && (doc.status === "submitted" || doc.status === "locked");
+                            return doc && (doc.status === "submitted" || doc.status === "locked" || doc.status === "complete");
                         }).length;
 
                         // Build CT dropdown options — re-read availableCTs each render so newly
@@ -6270,13 +6504,13 @@
                     const coachingId = coachingDoc ? coachingDoc.id : null;
 
                     // Determine visual state
-                    const isComplete = status === "submitted" || status === "locked";
-                    const isLocked = status === "locked";
+                    const isComplete = status === "submitted" || status === "locked" || status === "complete";
+                    const isDone = status === "locked" || status === "complete";
                     const isSubmitted = status === "submitted";
 
                     // Status badge
-                    const statusBadge = isLocked
-                        ? `<span style="font-size:9px;font-weight:700;background:var(--accent-green-dim);color:var(--accent-green);padding:2px 5px;border-radius:3px;font-family:monospace">LOCKED</span>`
+                    const statusBadge = isDone
+                        ? `<span style="font-size:9px;font-weight:700;background:var(--accent-green-dim);color:var(--accent-green);padding:2px 5px;border-radius:3px;font-family:monospace">COMPLETE</span>`
                         : isSubmitted
                         ? `<span style="font-size:9px;font-weight:700;background:var(--accent-green-dim);color:var(--accent-green);padding:2px 5px;border-radius:3px;font-family:monospace">SUBMITTED</span>`
                         : assignedCT
@@ -6287,21 +6521,45 @@
                           ].filter(Boolean).join(" ");
 
                     // CT assignment controls — shown below employee name
-                    const ctControls = isLocked ? "" : isSubmitted
-                        ? `<div style="margin-top:6px">
-                             <button onclick="lockCoaching('${coachingId}')" style="padding:3px 8px;background:var(--accent-green-dim);color:var(--accent-green);border:1px solid var(--accent-green);border-radius:4px;font-size:10px;cursor:pointer;">Lock</button>
+                    const ctControls = isDone ? "" : isSubmitted
+                        ? `<div style="margin-top:6px; display:flex; gap:6px; flex-wrap:wrap;">
+                             <button onclick="openCoachingReviewModal('${coachingId}')"
+                                 style="padding:3px 10px;background:var(--accent-cyan-dim);color:var(--accent-cyan);border:1px solid var(--accent-cyan);border-radius:4px;font-size:10px;font-weight:600;cursor:pointer;">
+                                 Review Form</button>
+                             <button onclick="completeCoaching('${coachingId}')"
+                                 style="padding:3px 10px;background:var(--accent-green-dim);color:var(--accent-green);border:1px solid var(--accent-green);border-radius:4px;font-size:10px;font-weight:600;cursor:pointer;">
+                                 Mark Complete</button>
                            </div>`
                         : assignedCT
                         ? `<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
-                             <span style="font-size:12px;color:var(--text-muted);font-weight:500;">CT: ${assignedCT}</span>
-                             <button onclick="unassignCT('${coachingId}')" style="padding:5px 10px;background:var(--bg-surface);border:1px solid var(--border);border-radius:6px;font-size:11px;cursor:pointer;color:var(--text-muted);">Unassign</button>
+                             <div style="flex:1;min-width:0;">
+                               <div style="font-size:12px;color:var(--text-muted);font-weight:500;">CT: ${assignedCT}</div>
+                               ${coachingDoc.templateName ? `<div style="font-size:10px;color:var(--text-muted);margin-top:2px;">Form: ${coachingDoc.templateName}</div>` : ""}
+                               ${coachingDoc.managerNotes ? `<div style="font-size:10px;color:var(--text-muted);margin-top:2px;font-style:italic;">"${coachingDoc.managerNotes}"</div>` : ""}
+                             </div>
+                             <button onclick="unassignCT('${coachingId}')" style="padding:5px 10px;background:var(--bg-surface);border:1px solid var(--border);border-radius:6px;font-size:11px;cursor:pointer;color:var(--text-muted);flex-shrink:0;">Unassign</button>
                            </div>`
-                        : `<div style="margin-top:8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
-                             <button id="ct-sel-btn-${dropId}" class="ct-custom-sel-btn" data-value="" onclick="openCTDropdown(this, '${dropId}')">
-                               <span class="ct-sel-label" style="color:var(--text-muted)">Select CT…</span>
-                               <span style="font-size:9px;opacity:0.5">▼</span>
-                             </button>
-                             <button onclick="assignCT('${safeName}', getCTSelVal('${dropId}'), ${ePPH.toFixed(2)}, ${(eGAP*100).toFixed(2)})" style="padding:6px 12px;background:var(--accent-cyan-dim);color:var(--accent-cyan);border:1px solid var(--accent-cyan);border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">Assign</button>
+                        : `<div style="margin-top:8px;">
+                             ${coachingTemplates.length
+                               ? `<select id="tmpl-sel-${dropId}"
+                                      style="width:100%;padding:4px 6px;background:var(--bg-base);border:1px solid var(--border);border-radius:4px;color:var(--text-primary);font-size:11px;margin-bottom:6px;box-sizing:border-box;">
+                                    <option value="">Select template…</option>
+                                    ${coachingTemplates.map(t =>
+                                      `<option value="${t.id}" ${getDefaultTemplateId(e.jobTitle) === t.id ? 'selected' : ''}>${t.name}</option>`
+                                    ).join("")}
+                                  </select>`
+                               : `<div style="font-size:10px;color:var(--text-muted);margin-bottom:6px;">No templates configured — contact admin</div>`
+                             }
+                             <textarea id="notes-${dropId}" placeholder="Notes for CT (optional)…" rows="2"
+                               style="width:100%;padding:4px 6px;background:var(--bg-base);border:1px solid var(--border);border-radius:4px;color:var(--text-primary);font-size:11px;resize:none;box-sizing:border-box;margin-bottom:6px;"></textarea>
+                             <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+                               <button id="ct-sel-btn-${dropId}" class="ct-custom-sel-btn" data-value="" onclick="openCTDropdown(this, '${dropId}')">
+                                 <span class="ct-sel-label" style="color:var(--text-muted)">Select CT…</span>
+                                 <span style="font-size:9px;opacity:0.5">▼</span>
+                               </button>
+                               <button onclick="assignCT('${safeName}', getCTSelVal('${dropId}'), getTmplSelVal('${dropId}'), ${ePPH.toFixed(2)}, ${(eGAP*100).toFixed(2)}, getNotesVal('${dropId}'))"
+                                   style="padding:6px 12px;background:var(--accent-cyan-dim);color:var(--accent-cyan);border:1px solid var(--accent-cyan);border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">Assign</button>
+                             </div>
                            </div>`;
 
                     return `<div style="padding:9px 12px;
@@ -6757,6 +7015,28 @@
                 }
             }
 
+            // Load all coaching templates from Firestore into the module-level coachingTemplates array.
+            // Called on manager/admin init so templates are available for CT assignment flows.
+            async function loadCoachingTemplates() {
+                try {
+                    const snap = await db.collection("coachingTemplates").orderBy("name").get();
+                    coachingTemplates = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                } catch (e) {
+                    console.error("loadCoachingTemplates error:", e);
+                    coachingTemplates = [];
+                }
+            }
+
+            // Return the template id whose jobTitles list includes the given job title (case-insensitive).
+            // Returns "" if no match — used to pre-select the template dropdown for unassigned employees.
+            function getDefaultTemplateId(jobTitle) {
+                if (!jobTitle) return "";
+                const tmpl = coachingTemplates.find(t =>
+                    (t.jobTitles || []).some(jt => jt.trim().toLowerCase() === jobTitle.trim().toLowerCase())
+                );
+                return tmpl ? tmpl.id : "";
+            }
+
             // Start a real-time listener on this manager's coachings.
             // Keeps managerCoachingDocs in sync and re-renders the coaching panel on each change.
             // Guards against duplicate listeners — safe to call multiple times.
@@ -6840,17 +7120,37 @@
                 return btn ? (btn.dataset.value || "") : "";
             }
 
-            async function assignCT(employeeName, ctUid, snapshotPPH = null, snapshotGAP = null) {
+            // Read the selected template id for a given employee card (by dropId).
+            function getTmplSelVal(dropId) {
+                const sel = document.getElementById("tmpl-sel-" + dropId);
+                return sel ? sel.value : "";
+            }
+
+            // Read the manager notes textarea for a given employee card (by dropId).
+            function getNotesVal(dropId) {
+                const ta = document.getElementById("notes-" + dropId);
+                return ta ? ta.value.trim() : "";
+            }
+
+            async function assignCT(employeeName, ctUid, templateId, snapshotPPH = null, snapshotGAP = null, managerNotes = "") {
                 if (!ctUid) return;
                 const ct = availableCTs.find(c => c.uid === ctUid);
                 if (!ct) return;
+
+                // Validate that a template was selected — required for the CT coaching form
+                const tmpl = coachingTemplates.find(t => t.id === templateId);
+                if (!tmpl) { alert("Please select a coaching template before assigning."); return; }
+                // Snapshot the template points at assignment time so the CT form is stable
+                // even if the admin later edits the template.
+                const templatePointsSnapshot = tmpl.points.slice().sort((a, b) => a.order - b.order)
+                    .map(p => ({ id: p.id, label: p.label, order: p.order }));
 
                 // Enforce 5-employee cap: count total active (non-locked) coachings for this CT
                 try {
                     const capSnap = await db.collection("coachings")
                         .where("ctId", "==", ctUid)
                         .get();
-                    const activeCount = capSnap.docs.filter(d => d.data().status !== "locked").length;
+                    const activeCount = capSnap.docs.filter(d => d.data().status !== "locked" && d.data().status !== "complete").length;
                     if (activeCount >= 5) {
                         alert(`${ct.name} already has 5 active coaching assignments. Complete or lock existing coachings before adding more.`);
                         return;
@@ -6877,7 +7177,11 @@
                             dateFrom,
                             dateTo,
                             snapshotPPH: pph,
-                            snapshotGAP: gap
+                            snapshotGAP: gap,
+                            templateId,
+                            templateName: tmpl.name,
+                            templatePointsSnapshot,
+                            managerNotes: managerNotes || ""
                         });
                     } else {
                         await db.collection("coachings").add({
@@ -6894,8 +7198,10 @@
                             snapshotGAP: gap,
                             submittedAt: null,
                             lockedAt: null,
-                            trainingPoints: [],
-                            managerComment: ""
+                            templateId,
+                            templateName: tmpl.name,
+                            templatePointsSnapshot,
+                            managerNotes: managerNotes || ""
                         });
                     }
                 } catch (e) {
@@ -6920,15 +7226,78 @@
                 }
             }
 
-            // Lock a submitted coaching — prevents further edits by the CT.
-            async function lockCoaching(coachingId) {
+            // Complete a submitted coaching — prevents further edits by the CT.
+            // Writes status "complete" going forward; also sets lockedAt for backward compat with
+            // any existing Firestore queries that check lockedAt for sort/display purposes.
+            async function completeCoaching(coachingId) {
                 try {
                     await db.collection("coachings").doc(coachingId).update({
-                        status: "locked",
+                        status: "complete",
+                        completedAt: firebase.firestore.FieldValue.serverTimestamp(),
                         lockedAt: firebase.firestore.FieldValue.serverTimestamp()
                     });
                 } catch (e) {
-                    console.error("lockCoaching error:", e);
+                    console.error("completeCoaching error:", e);
+                }
+            }
+
+            // Open the coaching review modal so the manager can read the CT's submitted form.
+            async function openCoachingReviewModal(coachingId) {
+                const overlay = document.getElementById("coaching-review-overlay");
+                const body    = document.getElementById("coaching-review-body");
+                overlay.style.display = "flex";
+                body.innerHTML = '<div style="color:var(--text-muted); font-size:0.875rem; padding:1rem 0;">Loading…</div>';
+
+                try {
+                    const docSnap = await db.collection("coachings").doc(coachingId).get();
+                    if (!docSnap.exists) {
+                        body.innerHTML = '<div style="color:var(--accent-red);">Coaching record not found.</div>';
+                        return;
+                    }
+                    const data = docSnap.data();
+                    const points = (data.templatePointsSnapshot || []).slice().sort((a, b) => a.order - b.order);
+                    const saved  = {};
+                    for (const tp of (data.trainingPoints || [])) saved[tp.id] = tp;
+
+                    body.innerHTML = `
+                        <div style="margin-bottom:1rem;">
+                            <div style="font-size:1rem; font-weight:700; color:var(--text-primary); margin-bottom:2px;">${data.employeeName}</div>
+                            <div style="font-size:0.8rem; color:var(--text-muted);">${data.dateFrom || ""} – ${data.dateTo || ""}</div>
+                            <div style="font-size:0.8rem; color:var(--text-muted);">CT: ${data.ctName || "—"} · Template: ${data.templateName || "—"}</div>
+                        </div>
+                        ${data.snapshotPPH != null ? `
+                        <div style="display:flex; gap:12px; margin-bottom:1rem;">
+                            <div style="font-size:0.875rem; color:var(--accent-cyan);">PPH: ${parseFloat(data.snapshotPPH).toFixed(1)}</div>
+                            <div style="font-size:0.875rem; color:var(--accent-amber);">GAP: ${data.snapshotGAP != null ? parseFloat(data.snapshotGAP).toFixed(1) : "—"}%</div>
+                        </div>` : ""}
+                        ${(data.managerNotes || data.managerComment) ? `
+                        <div style="padding:0.65rem 0.875rem; background:var(--accent-amber-dim); border:1px solid var(--accent-amber); border-radius:6px; margin-bottom:1rem;">
+                            <div style="font-size:0.72rem; font-weight:700; color:var(--accent-amber); text-transform:uppercase; letter-spacing:0.06em; margin-bottom:3px;">Manager Notes</div>
+                            <div style="font-size:0.85rem; color:var(--text-primary);">${data.managerNotes || data.managerComment}</div>
+                        </div>` : ""}
+                        ${points.length ? `
+                        <div style="background:var(--bg-base); border:1px solid var(--border); border-radius:8px; overflow:hidden;">
+                            ${points.map(p => {
+                                const r = saved[p.id];
+                                const result = r ? r.result : null;
+                                const isComp = result === "competent";
+                                const isRev  = result === "review";
+                                return `<div style="padding:0.65rem 1rem; border-bottom:1px solid rgba(255,255,255,0.05);">
+                                    <div style="display:flex; align-items:flex-start; gap:10px;">
+                                        <div style="flex:1; font-size:0.85rem; color:var(--text-primary);">${p.label}</div>
+                                        <div style="flex-shrink:0; font-size:0.72rem; font-weight:700; padding:2px 8px; border-radius:4px;
+                                            background:${isComp ? "var(--accent-green-dim)" : isRev ? "var(--accent-amber-dim)" : "var(--bg-base)"};
+                                            color:${isComp ? "var(--accent-green)" : isRev ? "var(--accent-amber)" : "var(--text-muted)"};">
+                                            ${isComp ? "COMPETENT" : isRev ? "REVIEW" : "—"}
+                                        </div>
+                                    </div>
+                                    ${r && r.ctNotes ? `<div style="margin-top:5px; font-size:0.78rem; color:var(--text-secondary); font-style:italic;">${r.ctNotes}</div>` : ""}
+                                </div>`;
+                            }).join("")}
+                        </div>` : `<div style="color:var(--text-muted); font-size:0.875rem;">No coaching form data available.</div>`}`;
+                } catch (e) {
+                    console.error("openCoachingReviewModal error:", e);
+                    body.innerHTML = '<div style="color:var(--accent-red);">Error loading coaching form.</div>';
                 }
             }
 
@@ -6947,7 +7316,8 @@
                 const statusLabel = s => ({
                     assigned:   { text: "Coaching",  color: "var(--accent-amber)" },
                     submitted:  { text: "Submitted",  color: "var(--accent-green)" },
-                    locked:     { text: "Locked",     color: "var(--text-muted)"   },
+                    complete:   { text: "Complete",   color: "var(--text-muted)"   },
+                    locked:     { text: "Complete",   color: "var(--text-muted)"   }, // transition compat
                     unassigned: { text: "Unassigned", color: "var(--text-muted)"   }
                 }[s] || { text: s, color: "var(--text-muted)" });
 
@@ -6955,7 +7325,7 @@
                     // Find all coachings assigned to this CT by this manager
                     const assigned = Object.values(managerCoachingDocs)
                         .filter(c => c.ctId === ct.uid);
-                    const activeCount = assigned.filter(c => c.status !== "locked").length;
+                    const activeCount = assigned.filter(c => c.status !== "locked" && c.status !== "complete").length;
                     const isOpen = ctDropdownOpen.has(ct.uid);
                     const safeName = ct.name.replace(/'/g, "\\'");
                     const safeId   = ct.uid;
@@ -6994,6 +7364,153 @@
                 if (ctDropdownOpen.has(ctId)) ctDropdownOpen.delete(ctId);
                 else ctDropdownOpen.add(ctId);
                 renderManageCTsSection();
+            }
+
+            // ── COACHING TEMPLATE ADMIN ──────────────────────────────────────────────────
+
+            function renderCoachingTemplatesList() {
+                const container = document.getElementById("coaching-templates-list");
+                if (!container) return;
+                if (!coachingTemplates.length) {
+                    container.innerHTML = '<div style="color:var(--text-muted); font-size:0.85rem; padding:0.5rem 0;">No templates yet. Click "+ New Template" to create one.</div>';
+                    return;
+                }
+                container.innerHTML = coachingTemplates.map(t => {
+                    const safeId = t.id.replace(/'/g, "\\'");
+                    const jobChips = (t.jobTitles || []).map(jt =>
+                        `<span style="display:inline-block;padding:2px 7px;background:var(--bg-surface);border:1px solid var(--border);border-radius:4px;font-size:11px;color:var(--text-muted);margin-right:4px;">${jt}</span>`
+                    ).join("");
+                    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:0.65rem 0.875rem;background:var(--bg-base);border:1px solid var(--border);border-radius:8px;margin-bottom:0.5rem;flex-wrap:wrap;gap:8px;">
+                        <div style="flex:1;min-width:0;">
+                            <div style="font-weight:600;font-size:0.875rem;color:var(--text-primary);margin-bottom:4px;">${t.name}</div>
+                            <div style="margin-bottom:4px;">${jobChips || '<span style="font-size:11px;color:var(--text-muted);">No job title mappings</span>'}</div>
+                            <div style="font-size:0.75rem;color:var(--text-muted);">${(t.points || []).length} knowledge point${(t.points || []).length !== 1 ? "s" : ""}</div>
+                        </div>
+                        <div style="display:flex;gap:6px;flex-shrink:0;">
+                            <button onclick="openEditTemplateForm('${safeId}')" style="padding:4px 10px;background:var(--bg-surface);border:1px solid var(--border);border-radius:5px;font-size:12px;color:var(--text-primary);cursor:pointer;">Edit</button>
+                            <button onclick="deleteTemplate('${safeId}')" style="padding:4px 10px;background:var(--accent-red-dim);border:1px solid var(--accent-red);border-radius:5px;font-size:12px;color:var(--accent-red);cursor:pointer;">Delete</button>
+                        </div>
+                    </div>`;
+                }).join("");
+            }
+
+            function openNewTemplateForm() {
+                templateEditorPoints = [];
+                document.getElementById("template-editor-id").value = "";
+                document.getElementById("template-editor-title").textContent = "New Template";
+                document.getElementById("template-name-input").value = "";
+                document.getElementById("template-jobtitles-input").value = "";
+                renderTemplatePointsList();
+                document.getElementById("coaching-template-editor").style.display = "block";
+                document.getElementById("coaching-template-editor").scrollIntoView({ behavior: "smooth", block: "start" });
+            }
+
+            function openEditTemplateForm(templateId) {
+                const tmpl = coachingTemplates.find(t => t.id === templateId);
+                if (!tmpl) return;
+                templateEditorPoints = (tmpl.points || []).slice().sort((a, b) => a.order - b.order).map(p => ({ ...p }));
+                document.getElementById("template-editor-id").value = templateId;
+                document.getElementById("template-editor-title").textContent = "Edit Template";
+                document.getElementById("template-name-input").value = tmpl.name || "";
+                document.getElementById("template-jobtitles-input").value = (tmpl.jobTitles || []).join("\n");
+                renderTemplatePointsList();
+                document.getElementById("coaching-template-editor").style.display = "block";
+                document.getElementById("coaching-template-editor").scrollIntoView({ behavior: "smooth", block: "start" });
+            }
+
+            function renderTemplatePointsList() {
+                const container = document.getElementById("template-points-list");
+                if (!container) return;
+                if (!templateEditorPoints.length) {
+                    container.innerHTML = '<div style="color:var(--text-muted);font-size:0.82rem;padding:0.5rem 0;">No points yet. Click "+ Add Point".</div>';
+                    return;
+                }
+                container.innerHTML = templateEditorPoints.map((p, i) => `
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+                        <div style="display:flex;flex-direction:column;gap:2px;">
+                            <button onclick="moveTemplatePoint(${i}, -1)" ${i === 0 ? "disabled" : ""} style="padding:1px 5px;background:var(--bg-surface);border:1px solid var(--border);border-radius:3px;font-size:10px;cursor:pointer;line-height:1;">▲</button>
+                            <button onclick="moveTemplatePoint(${i}, 1)" ${i === templateEditorPoints.length - 1 ? "disabled" : ""} style="padding:1px 5px;background:var(--bg-surface);border:1px solid var(--border);border-radius:3px;font-size:10px;cursor:pointer;line-height:1;">▼</button>
+                        </div>
+                        <input type="text" value="${p.label.replace(/"/g, '&quot;')}" placeholder="Knowledge point label…"
+                            oninput="updateTemplatePointLabel(this, '${p.id}')"
+                            style="flex:1;padding:5px 8px;background:var(--bg-base);border:1px solid var(--border);border-radius:5px;color:var(--text-primary);font-size:0.825rem;" />
+                        <button onclick="deleteTemplatePoint('${p.id}')" style="padding:3px 8px;background:var(--accent-red-dim);border:1px solid var(--accent-red);border-radius:4px;font-size:11px;color:var(--accent-red);cursor:pointer;flex-shrink:0;">&#x2715;</button>
+                    </div>`).join("");
+            }
+
+            function addTemplatePoint() {
+                templateEditorPoints.push({ id: crypto.randomUUID(), label: "", order: templateEditorPoints.length });
+                renderTemplatePointsList();
+                // Focus the new input
+                const inputs = document.querySelectorAll("#template-points-list input[type=text]");
+                if (inputs.length) inputs[inputs.length - 1].focus();
+            }
+
+            function deleteTemplatePoint(pointId) {
+                templateEditorPoints = templateEditorPoints.filter(p => p.id !== pointId);
+                templateEditorPoints.forEach((p, i) => p.order = i);
+                renderTemplatePointsList();
+            }
+
+            function moveTemplatePoint(index, direction) {
+                const newIndex = index + direction;
+                if (newIndex < 0 || newIndex >= templateEditorPoints.length) return;
+                [templateEditorPoints[index], templateEditorPoints[newIndex]] = [templateEditorPoints[newIndex], templateEditorPoints[index]];
+                templateEditorPoints.forEach((p, i) => p.order = i);
+                renderTemplatePointsList();
+            }
+
+            function updateTemplatePointLabel(inputEl, pointId) {
+                const p = templateEditorPoints.find(pt => pt.id === pointId);
+                if (p) p.label = inputEl.value;
+            }
+
+            async function saveTemplate() {
+                const name = (document.getElementById("template-name-input").value || "").trim();
+                if (!name) { alert("Template name is required."); return; }
+                const jobTitles = (document.getElementById("template-jobtitles-input").value || "")
+                    .split("\n").map(s => s.trim()).filter(Boolean);
+                if (!templateEditorPoints.length) { alert("Add at least one knowledge point."); return; }
+                const unlabeled = templateEditorPoints.find(p => !p.label.trim());
+                if (unlabeled) { alert("All knowledge points must have a label."); return; }
+
+                const points = templateEditorPoints.map(p => ({ id: p.id, label: p.label.trim(), order: p.order }));
+                const id = document.getElementById("template-editor-id").value;
+                const data = { name, jobTitles, points, updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
+
+                try {
+                    if (id) {
+                        await db.collection("coachingTemplates").doc(id).update(data);
+                    } else {
+                        data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+                        await db.collection("coachingTemplates").add(data);
+                    }
+                    await loadCoachingTemplates();
+                    renderCoachingTemplatesList();
+                    cancelTemplateEdit();
+                } catch (e) {
+                    console.error("saveTemplate error:", e);
+                    alert("Failed to save template. Please try again.");
+                }
+            }
+
+            async function deleteTemplate(templateId) {
+                if (!confirm("Delete this coaching template? This cannot be undone. Existing coaching assignments using this template will be unaffected (they store a snapshot).")) return;
+                try {
+                    await db.collection("coachingTemplates").doc(templateId).delete();
+                    await loadCoachingTemplates();
+                    renderCoachingTemplatesList();
+                    cancelTemplateEdit();
+                } catch (e) {
+                    console.error("deleteTemplate error:", e);
+                    alert("Failed to delete template.");
+                }
+            }
+
+            function cancelTemplateEdit() {
+                document.getElementById("coaching-template-editor").style.display = "none";
+                document.getElementById("template-editor-id").value = "";
+                templateEditorPoints = [];
             }
 
             // ══════════════════════════════════════════
@@ -7273,11 +7790,11 @@
                     hasData ? "block" : "none";
                 if (!hasData) return;
 
-                // Load CTs first — must be awaited so availableCTs is populated before the
+                // Load CTs and templates first — must be awaited so availableCTs is populated before the
                 // coaching panel and the onSnapshot listener render their CT dropdowns/sections.
                 if (currentUserRole === "manager" || currentUserRole === "admin" ||
                     currentUserRole === "ops_manager" || currentUserRole === "general_manager" || currentUserRole === "area_manager") {
-                    await loadAvailableCTs();
+                    await Promise.all([loadAvailableCTs(), loadCoachingTemplates()]);
                     startManagerCoachingListener(); // first snapshot now sees populated availableCTs
                 }
 
@@ -8904,6 +9421,20 @@
             }
 
             // Auth handles initApp via onAuthStateChanged — no direct call needed
+
+            // Run once from console after deploy: await migrateLockedToComplete()
+            // Migrates all existing "locked" coaching docs to the new "complete" status.
+            // Safe to run multiple times — only touches docs still on "locked".
+            async function migrateLockedToComplete() {
+                const snap = await db.collection("coachings").where("status", "==", "locked").get();
+                const batch = db.batch();
+                snap.docs.forEach(d => batch.update(d.ref, {
+                    status: "complete",
+                    completedAt: d.data().lockedAt || firebase.firestore.FieldValue.serverTimestamp()
+                }));
+                await batch.commit();
+                console.log(`Migrated ${snap.docs.length} docs from locked → complete`);
+            }
 
             // Initialize flatpickr range picker once DOM is ready (runs synchronously
             // at script parse time since the script tag is at the end of the body).

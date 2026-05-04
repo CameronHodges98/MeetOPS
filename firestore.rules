@@ -56,6 +56,13 @@ service cloud.firestore {
       allow read, write: if request.auth != null;
     }
 
+    // Coaching form templates — any auth user can read (CTs and managers need them);
+    // only admins can create/edit/delete templates.
+    match /coachingTemplates/{tid} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
+    }
+
     // Revoked users — any authenticated user can read/write.
     // Written by manager during revoke; read by initApp() gate check.
     match /revokedUsers/{uid} {
