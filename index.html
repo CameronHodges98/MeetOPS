@@ -2413,9 +2413,15 @@
                                 <div class="dot"></div>
                                 Employee Rankings
                             </div>
-                            <span class="section-sub"
-                                >PPH LEADERBOARD — CURRENT PERIOD</span
-                            >
+                            <!-- Right side: label + manager filter dropdown (hidden for manager/area_manager roles) -->
+                            <div style="display:flex;align-items:center;gap:10px;">
+                                <span class="section-sub">PPH LEADERBOARD — CURRENT PERIOD</span>
+                                <select
+                                    class="filter-select"
+                                    id="ranking-manager-filter"
+                                    onchange="rankingManagerFilter = this.value; renderRankingTable(getFilteredRows());"
+                                ></select>
+                            </div>
                         </div>
                         <div class="data-table-wrap">
                             <table class="data-table" id="ranking-table">
@@ -3442,6 +3448,7 @@
             let currentUserRole = "manager"; // 'admin' | 'general_manager' | 'ops_manager' | 'area_manager' | 'manager' | 'ct'
             let currentUserSupervisor = null; // matched full supervisor name from data, null for admin/OM/GM
             let selectedManagerFilter = "all"; // supervisor name or "all" — OM/GM manager filter dropdown
+            let rankingManagerFilter = "all"; // supervisor name or "all" — Employee Rankings section filter
             // null = not an OM | [] = OM with no team assignments | string[] = assigned supervisor name strings
             let currentUserAssignedSupervisors = null;
             let currentCTName = ""; // full name of CT user from certifiedTrainers doc
@@ -3780,6 +3787,37 @@
                 const sel = document.getElementById("manager-filter");
                 selectedManagerFilter = sel ? sel.value : "all";
                 applyFilters();
+            }
+
+            // ── Employee Rankings manager filter (Dashboard) ─────────────────────────
+            // Repopulates the dropdown from the current filtered dataset (so it reflects
+            // any active date-range or location filter), validates the selected value,
+            // and shows/hides the control based on role.
+            function updateRankingManagerFilter() {
+                const sel = document.getElementById("ranking-manager-filter");
+                if (!sel) return;
+
+                // Manager and area_manager already see only their own team — no point filtering further.
+                // CT role never reaches the Dashboard. GM/OM/admin all benefit from the filter.
+                const isSupervisorScoped =
+                    currentUserRole === "manager" || currentUserRole === "area_manager";
+                sel.style.display = isSupervisorScoped ? "none" : "";
+                if (isSupervisorScoped) return;
+
+                // Derive unique supervisors from the current filtered dataset so the
+                // dropdown always matches what's visible in the table.
+                const rows = getFilteredRows();
+                const sups = [...new Set(rows.map(r => r["SUPERVISOR"]).filter(Boolean))].sort();
+
+                sel.innerHTML =
+                    '<option value="all">All Managers</option>' +
+                    sups.map(s => `<option value="${s}">${s}</option>`).join("");
+
+                // If the previously selected manager is no longer in the new dataset, reset.
+                if (rankingManagerFilter !== "all" && !sups.includes(rankingManagerFilter)) {
+                    rankingManagerFilter = "all";
+                }
+                sel.value = rankingManagerFilter;
             }
 
             // ── Role management page (GM only) ────────────────────────────────────────
@@ -5616,6 +5654,7 @@
                 const hasData = allDays.length > 0;
                 updateLocationFilter();
                 updateManagerFilter();
+                updateRankingManagerFilter();
                 const rows = getFilteredRows();
                 document.getElementById("record-count").textContent =
                     `${rows.length} records`;
@@ -7345,6 +7384,12 @@
                     .join("");
             }
             function renderRankingTable(rows) {
+                // Apply the Rankings-section manager filter before aggregating.
+                // rankingManagerFilter is kept in sync with the dropdown by updateRankingManagerFilter().
+                if (rankingManagerFilter !== "all") {
+                    rows = rows.filter(r => r["SUPERVISOR"] === rankingManagerFilter);
+                }
+
                 // Aggregate by employee — one row per unique employee using weighted PPH
                 const empMap = {};
                 rows.forEach((r) => {
