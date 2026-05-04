@@ -3780,10 +3780,10 @@
                 if (addShiftBtn)
                     addShiftBtn.style.display = currentUserRole === "general_manager" ? "" : "none";
 
-                // Coaching Templates section — admin only
+                // Coaching Templates section — admin and GM
                 const templatesSection = document.getElementById("coaching-templates-section");
                 if (templatesSection)
-                    templatesSection.style.display = currentUserRole === "admin" ? "block" : "none";
+                    templatesSection.style.display = (currentUserRole === "admin" || currentUserRole === "general_manager") ? "block" : "none";
             }
 
             // Maps Firebase auth error codes to plain-English messages.
