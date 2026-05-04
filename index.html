@@ -2419,7 +2419,7 @@
                                 <select
                                     class="filter-select"
                                     id="ranking-manager-filter"
-                                    onchange="rankingManagerFilter = this.value; renderRankingTable(getFilteredRows());"
+                                    onchange="rankingManagerFilter = this.value; renderAll();"
                                 ></select>
                             </div>
                         </div>
@@ -5663,10 +5663,15 @@
                 document.getElementById("dashboard-content").style.display =
                     hasData ? "block" : "none";
                 if (hasData) {
-                    renderKPIs(rows);
-                    renderPPHTrendChart();
-                    renderHoursDonut(rows);
-                    renderRankingTable(rows);
+                    // Apply the ranking manager filter so KPIs, donut, and table
+                    // all scope to the selected supervisor when one is chosen.
+                    const dashRows = rankingManagerFilter !== "all"
+                        ? rows.filter(r => r["SUPERVISOR"] === rankingManagerFilter)
+                        : rows;
+                    renderKPIs(dashRows);
+                    renderPPHTrendChart();   // handles its own manager-filter internally
+                    renderHoursDonut(dashRows);
+                    renderRankingTable(dashRows);
                 }
             }
 
@@ -5795,6 +5800,12 @@
                         }
                     } else if (currentUserRole === "general_manager" && selectedManagerFilter !== "all") {
                         rows = rows.filter(r => r["SUPERVISOR"] === selectedManagerFilter);
+                    }
+
+                    // Ranking manager filter: scope trend chart to selected supervisor
+                    // (no-op when "all" or for supervisor-scoped roles since they exit above)
+                    if (rankingManagerFilter !== "all") {
+                        rows = rows.filter(r => r["SUPERVISOR"] === rankingManagerFilter);
                     }
 
                     weekMap.get(key).rows.push(...rows);
