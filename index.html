@@ -7039,11 +7039,12 @@
 
             // Start a real-time listener on this manager's coachings.
             // Keeps managerCoachingDocs in sync and re-renders the coaching panel on each change.
-            // Guards against duplicate listeners — safe to call multiple times.
+            // Queries ALL coachings (no managerId filter) so that OMs/GMs assigning coachings
+            // for a manager's team are visible to that manager, and CT load counts reflect
+            // company-wide assignments regardless of who assigned them.
             function startManagerCoachingListener() {
                 if (managerCoachingListener) return; // already running
                 managerCoachingListener = db.collection("coachings")
-                    .where("managerId", "==", currentUser.uid)
                     .onSnapshot(snap => {
                         managerCoachingDocs = {};
                         for (const doc of snap.docs) {
@@ -7322,7 +7323,7 @@
                 }[s] || { text: s, color: "var(--text-muted)" });
 
                 container.innerHTML = availableCTs.map(ct => {
-                    // Find all coachings assigned to this CT by this manager
+                    // All coachings for this CT across all managers (company-wide load)
                     const assigned = Object.values(managerCoachingDocs)
                         .filter(c => c.ctId === ct.uid);
                     const activeCount = assigned.filter(c => c.status !== "locked" && c.status !== "complete").length;
@@ -7334,7 +7335,10 @@
                         ? assigned.map(c => {
                             const sl = statusLabel(c.status);
                             return `<div style="display:flex;align-items:center;justify-content:space-between;padding:0.4rem 0.75rem;border-top:1px solid var(--border);">
-                                <span style="font-size:0.82rem;color:var(--text-primary);">${c.employeeName}</span>
+                                <div>
+                                  <span style="font-size:0.82rem;color:var(--text-primary);">${c.employeeName}</span>
+                                  ${c.managerName ? `<span style="font-size:0.72rem;color:var(--text-muted);margin-left:6px;">(${c.managerName})</span>` : ""}
+                                </div>
                                 <span style="font-size:0.75rem;font-weight:600;color:${sl.color};">${sl.text}</span>
                             </div>`;
                           }).join("")
